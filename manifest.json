@@ -1,23 +1,37 @@
 {
-    "manifest_version": 3,
-    "name": "Messenger AI Helper",
-    "version": "1.0",
-    "description": "Adds an AI helper button to Facebook Messenger",
-    "permissions": ["activeTab"],
-    "content_scripts": [
-      {
-        "matches": ["*://*.facebook.com/*", "*://*.messenger.com/*"],
-        "js": ["content.js"],
-        "css": ["styles.css"],
-        "run_at": "document_end"
-      }
-    ],
-    "action": {
-      "default_icon": {
-        "16": "icons/icon16.png",
-        "48": "icons/icon48.png",
-        "128": "icons/icon128.png"
-      }
+  "manifest_version": 3,
+  "name": "Messenger AI Helper",
+  "version": "1.0",
+  "description": "Adds an AI helper button to Facebook Messenger",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.anthropic.com/*",
+    "*://*.facebook.com/*",
+    "*://*.messenger.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.facebook.com/*", "*://*.messenger.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [{
+    "resources": ["anthropicService.js"],
+    "matches": ["*://*.facebook.com/*", "*://*.messenger.com/*"]
+  }],
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
     }
   }
-  
+}

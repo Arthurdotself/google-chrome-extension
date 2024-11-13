@@ -1,30 +1,73 @@
-function createAIHelper() {
+// Content script
+async function createAIHelper() {
   console.log('Facebook Message Extractor initialized');
 
-  function createAIButton() {
-    const button = document.createElement('button');
-    button.className = 'ai-helper-button';
-    button.setAttribute('title', 'Extract Messages');
-    button.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" fill="#0084ff"/>
-      </svg>
-    `;
-    return button;
+  // Load anthropicService.js directly
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('anthropicService.js');
+  script.type = 'module';
+  document.head.appendChild(script);
+
+  async function processMessages(customerMessage, conversation_history) {
+    try {
+      const { generateFullResponse } = await import(chrome.runtime.getURL('anthropicService.js'));
+      return await generateFullResponse(customerMessage, conversation_history);
+    } catch (error) {
+      console.error('Error in processMessages:', error);
+      return 'Sorry, I encountered an error processing your message.';
+    }
   }
 
-  // In the extractMessages function, update the filtering logic:
+  function getConversationData() {
+    const messages = extractMessages();
+    
+    const conversation_history = messages.map(msg => ({
+      role: msg.isBot ? 'assistant' : 'user',
+      content: msg.text,
+      timestamp: msg.timestamp,
+      sender: msg.sender
+    }));
+
+    const lastBotMessageIndex = conversation_history
+      .map(msg => msg.role === 'assistant')
+      .lastIndexOf(true);
+
+    const customerMessage = lastBotMessageIndex >= 0 
+      ? messages.slice(lastBotMessageIndex + 1)
+          .map(msg => msg.text)
+          .join('\n')
+      : messages[messages.length - 1]?.text || '';
+
+    return { conversation_history, customerMessage };
+  }
+
+  function writeToChat(message) {
+    try {
+      const textarea = document.querySelector('textarea[placeholder="Reply in Messenger…"]');
+      if (textarea) {
+        textarea.value = message;
+        const event = new Event('input', {
+          bubbles: true,
+          cancelable: true,
+        });
+        textarea.dispatchEvent(event);
+        textarea.focus();
+      } else {
+        console.log('Textarea not found');
+      }
+    } catch (error) {
+      console.error('Error writing to chat:', error);
+    }
+  }
 
   function extractMessages() {
-    // Message container selectors used by Facebook
     const messageSelectors = [
-      '.x1y1aw1k.xn6708d.xwib8y2.x1ye3gou', // Primary message container
-      '[role="gridcell"] [dir="auto"]',      // Alternative message container
-      '.xzsf02u',                            // Message text container
-      '.x1slwz57'                            // Another message variant
+      '.x1y1aw1k.xn6708d.xwib8y2.x1ye3gou',
+      '[role="gridcell"] [dir="auto"]',
+      '.xzsf02u',
+      '.x1slwz57'
     ];
   
-    // Time stamp selectors
     const timeSelectors = [
       '.x14vqqas.x11i5rnm.xod5an3.xmn8rco span',
       'time',
@@ -34,17 +77,15 @@ function createAIHelper() {
     const extractedMessages = [];
     let currentTimestamp = '';
   
-    // Extract timestamps
     timeSelectors.forEach(selector => {
       const timestamps = document.querySelectorAll(selector);
       timestamps.forEach(timestamp => {
-        if (timestamp.textContent.includes('202')) { // Only get full timestamps
+        if (timestamp.textContent.includes('202')) {
           currentTimestamp = timestamp.textContent.trim();
         }
       });
     });
   
-    // Comprehensive list of system messages and UI elements to filter out
     const filterOutTexts = [
       'More Items',
       'Close',
@@ -67,46 +108,32 @@ function createAIHelper() {
       'Menu'
     ];
   
-    // Function to check if text is a system message
     const isSystemMessage = (text) => {
-      // Check if it's in our filterOutTexts array
       if (filterOutTexts.some(filter => text.includes(filter))) return true;
-      
-      // Check if it's a timestamp
       if (text.match(/^Nov \d+, 202\d, \d+:\d+\s*(?:AM|PM)$/)) return true;
-      
-      // Check if it's empty or just whitespace
       if (!text.trim()) return true;
       
-      // Check if it's repeated text (like "MessengerMessengerMessenger")
       const words = text.split(/\s+/);
       if (words.length === 1 && text.length > 20) {
         const uniqueChars = [...new Set(text)].join('');
         if (text.length / uniqueChars.length > 3) return true;
       }
   
-      // Check if it's UI related text
-      if (text.startsWith('All messages') || 
-          text.startsWith('Messenger') || 
-          text.startsWith('Instagram') || 
-          text.startsWith('Facebook comments')) return true;
-  
-      return false;
+      return text.startsWith('All messages') || 
+             text.startsWith('Messenger') || 
+             text.startsWith('Instagram') || 
+             text.startsWith('Facebook comments');
     };
   
-    // Extract messages using multiple selectors
     messageSelectors.forEach(selector => {
       const containers = document.querySelectorAll(selector);
       containers.forEach(container => {
         const messageText = container.textContent.trim();
         
-        // Check if the message should be included
         if (messageText && !isSystemMessage(messageText)) {
-          // Determine if it's a bot message
           const isBot = container.closest('.x13a6bvl') !== null || 
                        container.closest('[data-scope="bot_response"]') !== null;
           
-          // Get the sender name if available
           let sender = '';
           const senderElement = container.closest('.xuk3077')?.querySelector('[data-scope="first_name"]') || 
                                container.closest('.xuk3077')?.querySelector('.xzsf02u');
@@ -114,7 +141,6 @@ function createAIHelper() {
             sender = senderElement.textContent.trim();
           }
   
-          // Add message only if it's not a system message
           if (!isSystemMessage(messageText)) {
             extractedMessages.push({
               text: messageText,
@@ -127,147 +153,54 @@ function createAIHelper() {
       });
     });
   
-    // Final cleanup: Remove duplicates and any remaining system messages
     return extractedMessages.filter((message, index, self) => {
-      // Check for duplicates
       const isDuplicate = index !== self.findIndex((m) => m.text === message.text);
-      // Double-check it's not a system message
       const isSystem = isSystemMessage(message.text);
-      
       return !isDuplicate && !isSystem;
     });
   }
 
-  function createMessagePopup(messages) {
-    // Create popup container
-    const popup = document.createElement('div');
-    popup.id = 'message-extractor-popup';
-    popup.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 80%;
-      max-width: 600px;
-      max-height: 80vh;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 9999;
-      padding: 20px;
-      overflow-y: auto;
+  function createAIButton() {
+    const button = document.createElement('button');
+    button.className = 'ai-helper-button';
+    button.title = 'Get AI Response';
+    button.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" fill="#0084ff"/>
+      </svg>
     `;
-
-    // Create header with title and close button
-    const header = document.createElement('div');
-    header.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <h2 style="margin: 0;">Messages (${messages.length})</h2>
-        <button style="border: none; background: none; font-size: 24px; cursor: pointer;" onclick="this.parentElement.parentElement.parentElement.remove();document.getElementById('extractor-overlay').remove()">×</button>
-      </div>
-      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-        <button id="copy-all" style="padding: 8px 16px; background: #0084ff; color: white; border: none; border-radius: 4px; cursor: pointer;">Copy All</button>
-        <button id="download-all" style="padding: 8px 16px; background: #0084ff; color: white; border: none; border-radius: 4px; cursor: pointer;">Download</button>
-      </div>
-    `;
-    popup.appendChild(header);
-
-    // Add messages
-    const messageContainer = document.createElement('div');
-    messageContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px;';
-
-    messages.forEach(message => {
-      const messageEl = document.createElement('div');
-      messageEl.style.cssText = `
-        padding: 10px;
-        border-radius: 4px;
-        background: ${message.isBot ? '#f0f7ff' : '#f5f5f5'};
-        border: 1px solid ${message.isBot ? '#e1f0ff' : '#eee'};
-      `;
-
-      messageEl.innerHTML = `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; color: #666;">
-          <span>${message.timestamp}${message.sender ? ' • ' + message.sender : ''}</span>
-          <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.textContent);this.textContent='Copied!';setTimeout(() => this.textContent='Copy', 2000)" 
-                  style="border: none; background: none; color: #0084ff; cursor: pointer; font-size: 12px;">Copy</button>
-        </div>
-        <div style="color: ${message.isBot ? '#0055a5' : '#333'}">${message.text}</div>
-      `;
-
-      messageContainer.appendChild(messageEl);
-    });
-
-    popup.appendChild(messageContainer);
-
-    // Add event listeners for copy and download buttons
-    popup.querySelector('#copy-all').addEventListener('click', () => {
-      const text = messages.map(msg => 
-        `[${msg.timestamp}] ${msg.sender ? msg.sender + ': ' : ''}${msg.text}`
-      ).join('\n');
-      navigator.clipboard.writeText(text);
-      popup.querySelector('#copy-all').textContent = 'Copied!';
-      setTimeout(() => popup.querySelector('#copy-all').textContent = 'Copy All', 2000);
-    });
-
-    popup.querySelector('#download-all').addEventListener('click', () => {
-      const text = messages.map(msg => 
-        `[${msg.timestamp}] ${msg.sender ? msg.sender + ': ' : ''}${msg.text}`
-      ).join('\n');
-      const blob = new Blob([text], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'facebook-messages.txt';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
-
-    // Add overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'extractor-overlay';
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 9998;
-    `;
-    overlay.onclick = () => {
-      popup.remove();
-      overlay.remove();
-    };
-
-    document.body.appendChild(overlay);
-    document.body.appendChild(popup);
+    return button;
   }
 
   function insertAIHelper() {
-    // Find the "Insert saved reply" button
-    const savedReplyButton = document.querySelector('div[aria-label="Insert saved reply"][role="button"]');
+    const savedReplyButton = document.querySelector('div[aria-label="Insert saved reply"]');
     if (!savedReplyButton || document.querySelector('.ai-helper-button')) {
       return;
     }
 
-    // Create and insert the button
-    const extractorButton = createAIButton();
-    savedReplyButton.parentElement.insertBefore(extractorButton, savedReplyButton.nextSibling);
+    const aiButton = createAIButton();
+    savedReplyButton.parentElement.insertBefore(aiButton, savedReplyButton.nextSibling);
 
-    // Handle button click
-    extractorButton.addEventListener('click', (e) => {
+    aiButton.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Extracting messages...');
       
-      const messages = extractMessages();
-      createMessagePopup(messages);
+      const { conversation_history, customerMessage } = getConversationData();
+      
+      console.log('Conversation History:', conversation_history);
+      console.log('Last Customer Message:', customerMessage);
+      
+      try {
+        writeToChat('Generating response...');
+        const response = await processMessages(customerMessage, JSON.stringify(conversation_history));
+        writeToChat(response);
+      } catch (error) {
+        console.error('Error processing message:', error);
+        writeToChat('Sorry, I encountered an error processing your message.');
+      }
     });
   }
 
-  // Add custom styles
   const style = document.createElement('style');
   style.textContent = `
     .ai-helper-button {
@@ -284,21 +217,19 @@ function createAIHelper() {
   `;
   document.head.appendChild(style);
 
-  // Initial attempt to insert the button
   insertAIHelper();
 
-  // Watch for DOM changes to dynamically reinsert the button
   const observer = new MutationObserver(() => {
     insertAIHelper();
   });
 
   observer.observe(document.body, {
     childList: true,
-    subtree: true,
+    subtree: true
   });
 }
 
-// Initialize the extension
+// Initialize
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', createAIHelper);
 } else {
