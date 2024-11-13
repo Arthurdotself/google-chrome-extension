@@ -1,0 +1,23 @@
+{
+    "manifest_version": 3,
+    "name": "Messenger AI Helper",
+    "version": "1.0",
+    "description": "Adds an AI helper button to Facebook Messenger",
+    "permissions": ["activeTab"],
+    "content_scripts": [
+      {
+        "matches": ["*://*.facebook.com/*", "*://*.messenger.com/*"],
+        "js": ["content.js"],
+        "css": ["styles.css"],
+        "run_at": "document_end"
+      }
+    ],
+    "action": {
+      "default_icon": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+      }
+    }
+  }
+  
