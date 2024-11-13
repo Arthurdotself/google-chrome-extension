@@ -15,88 +15,128 @@ function createAIHelper() {
 
   // In the extractMessages function, update the filtering logic:
 
-function extractMessages() {
-  // Message container selectors used by Facebook
-  const messageSelectors = [
-    '.x1y1aw1k.xn6708d.xwib8y2.x1ye3gou', // Primary message container
-    '[role="gridcell"] [dir="auto"]',      // Alternative message container
-    '.xzsf02u',                            // Message text container
-    '.x1slwz57'                            // Another message variant
-  ];
-
-  // Time stamp selectors
-  const timeSelectors = [
-    '.x14vqqas.x11i5rnm.xod5an3.xmn8rco span',
-    'time',
-    '[data-scope="timestamp"]'
-  ];
-
-  const extractedMessages = [];
-  let currentTimestamp = '';
-
-  // Extract timestamps
-  timeSelectors.forEach(selector => {
-    const timestamps = document.querySelectorAll(selector);
-    timestamps.forEach(timestamp => {
-      if (timestamp.textContent.includes('202')) { // Only get full timestamps
-        currentTimestamp = timestamp.textContent.trim();
-      }
-    });
-  });
-
-  // List of text to filter out
-  const filterOutTexts = [
-    'More Items',
-    'Close',
-    'Insert saved reply',
-    'Choose your language:',
-    'Your message has been received',
-    'Copy'
-  ];
-
-  // Extract messages using multiple selectors
-  messageSelectors.forEach(selector => {
-    const containers = document.querySelectorAll(selector);
-    containers.forEach(container => {
-      const messageText = container.textContent.trim();
-      
-      // Check if the message should be included
-      const shouldInclude = messageText && 
-                          messageText.length > 0 &&
-                          !filterOutTexts.some(filterText => 
-                            messageText.includes(filterText)) &&
-                          !messageText.match(/^Nov \d+, 202\d, \d+:\d+\s*(?:AM|PM)$/); // Exclude timestamp-only messages
-      
-      if (shouldInclude) {
-        // Determine if it's a bot message
-        const isBot = container.closest('.x13a6bvl') !== null || 
-                     container.closest('[data-scope="bot_response"]') !== null;
-        
-        // Get the sender name if available
-        let sender = '';
-        const senderElement = container.closest('.xuk3077')?.querySelector('[data-scope="first_name"]') || 
-                             container.closest('.xuk3077')?.querySelector('.xzsf02u');
-        if (senderElement) {
-          sender = senderElement.textContent.trim();
+  function extractMessages() {
+    // Message container selectors used by Facebook
+    const messageSelectors = [
+      '.x1y1aw1k.xn6708d.xwib8y2.x1ye3gou', // Primary message container
+      '[role="gridcell"] [dir="auto"]',      // Alternative message container
+      '.xzsf02u',                            // Message text container
+      '.x1slwz57'                            // Another message variant
+    ];
+  
+    // Time stamp selectors
+    const timeSelectors = [
+      '.x14vqqas.x11i5rnm.xod5an3.xmn8rco span',
+      'time',
+      '[data-scope="timestamp"]'
+    ];
+  
+    const extractedMessages = [];
+    let currentTimestamp = '';
+  
+    // Extract timestamps
+    timeSelectors.forEach(selector => {
+      const timestamps = document.querySelectorAll(selector);
+      timestamps.forEach(timestamp => {
+        if (timestamp.textContent.includes('202')) { // Only get full timestamps
+          currentTimestamp = timestamp.textContent.trim();
         }
-
-        extractedMessages.push({
-          text: messageText,
-          isBot: isBot,
-          timestamp: currentTimestamp,
-          sender: sender
-        });
-      }
+      });
     });
-  });
-
-  // Remove duplicates and filter out system messages
-  return extractedMessages.filter((message, index, self) =>
-    index === self.findIndex((m) => m.text === message.text) && 
-    !message.text.includes('Copy') &&
-    !message.text.match(/^Nov \d+, 202\d, \d+:\d+\s*(?:AM|PM)$/)
-  );
-}
+  
+    // Comprehensive list of system messages and UI elements to filter out
+    const filterOutTexts = [
+      'More Items',
+      'Close',
+      'Insert saved reply',
+      'Choose your language:',
+      'Your message has been received',
+      'Copy',
+      'Automations',
+      'Messaging insights',
+      'Available',
+      'Message settings',
+      'All messages',
+      'Messenger',
+      'Instagram',
+      'Facebook comments',
+      'Instagram comments',
+      'More',
+      'Open Dropdown',
+      'Reply in Messenger',
+      'Menu'
+    ];
+  
+    // Function to check if text is a system message
+    const isSystemMessage = (text) => {
+      // Check if it's in our filterOutTexts array
+      if (filterOutTexts.some(filter => text.includes(filter))) return true;
+      
+      // Check if it's a timestamp
+      if (text.match(/^Nov \d+, 202\d, \d+:\d+\s*(?:AM|PM)$/)) return true;
+      
+      // Check if it's empty or just whitespace
+      if (!text.trim()) return true;
+      
+      // Check if it's repeated text (like "MessengerMessengerMessenger")
+      const words = text.split(/\s+/);
+      if (words.length === 1 && text.length > 20) {
+        const uniqueChars = [...new Set(text)].join('');
+        if (text.length / uniqueChars.length > 3) return true;
+      }
+  
+      // Check if it's UI related text
+      if (text.startsWith('All messages') || 
+          text.startsWith('Messenger') || 
+          text.startsWith('Instagram') || 
+          text.startsWith('Facebook comments')) return true;
+  
+      return false;
+    };
+  
+    // Extract messages using multiple selectors
+    messageSelectors.forEach(selector => {
+      const containers = document.querySelectorAll(selector);
+      containers.forEach(container => {
+        const messageText = container.textContent.trim();
+        
+        // Check if the message should be included
+        if (messageText && !isSystemMessage(messageText)) {
+          // Determine if it's a bot message
+          const isBot = container.closest('.x13a6bvl') !== null || 
+                       container.closest('[data-scope="bot_response"]') !== null;
+          
+          // Get the sender name if available
+          let sender = '';
+          const senderElement = container.closest('.xuk3077')?.querySelector('[data-scope="first_name"]') || 
+                               container.closest('.xuk3077')?.querySelector('.xzsf02u');
+          if (senderElement) {
+            sender = senderElement.textContent.trim();
+          }
+  
+          // Add message only if it's not a system message
+          if (!isSystemMessage(messageText)) {
+            extractedMessages.push({
+              text: messageText,
+              isBot: isBot,
+              timestamp: currentTimestamp,
+              sender: sender
+            });
+          }
+        }
+      });
+    });
+  
+    // Final cleanup: Remove duplicates and any remaining system messages
+    return extractedMessages.filter((message, index, self) => {
+      // Check for duplicates
+      const isDuplicate = index !== self.findIndex((m) => m.text === message.text);
+      // Double-check it's not a system message
+      const isSystem = isSystemMessage(message.text);
+      
+      return !isDuplicate && !isSystem;
+    });
+  }
 
   function createMessagePopup(messages) {
     // Create popup container
