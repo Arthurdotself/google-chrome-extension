@@ -2,11 +2,34 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 8px;
-    border-radius: 50%;
-    transition: background-color 0.2s;
+    padding: 6px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 8px;
+    position: relative;
+    vertical-align: middle;
+    width: 32px;
+    height: 32px;
 }
 
 .ai-helper-button:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: rgba(16, 163, 127, 0.1);
+}
+
+.ai-helper-button svg {
+    color: #10a37f; /* ChatGPT's signature green color */
+    width: 22px;
+    height: 22px;
+}
+
+.ai-helper-button:active {
+    transform: scale(0.95);
+}
+
+/* Make sure the button container is inline */
+div[aria-label="Insert saved reply"] {
+    display: inline-flex;
 }

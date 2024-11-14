@@ -5,8 +5,12 @@ async function makeAnthropicRequest(messages) {
             messages: messages
         });
 
+        if (!response) {
+            throw new Error('No response from background script');
+        }
+
         if (!response.success) {
-            throw new Error(response.error);
+            throw new Error(response.error || 'Unknown error occurred');
         }
 
         return response.data;
@@ -32,6 +36,12 @@ async function generateFullResponse(customerMessage, conversationHistory) {
         } catch (error) {
             console.error('Error formatting conversation history:', error);
             formattedHistory = '';
+        }
+
+        // First check if API key is set
+        const storage = await chrome.storage.local.get(['anthropicApiKey']);
+        if (!storage.anthropicApiKey) {
+            throw new Error('API key not found. Please set it in the extension settings.');
         }
 
         const messages = [{
@@ -155,6 +165,9 @@ macbook-air-15-inch-m2/
         }
     } catch (error) {
         console.error('Error in generateFullResponse:', error);
+        if (error.message.includes('API key')) {
+            return "Please set up your Anthropic API key in the extension settings (click the extension icon in your browser toolbar).";
+        }
         return "I apologize, but I'm having trouble processing your request right now. Please try again.";
     }
 }
