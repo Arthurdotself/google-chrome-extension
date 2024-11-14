@@ -1,23 +1,33 @@
 // background.js
-const ANTHROPIC_API_KEY = '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';
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'makeAnthropicRequest') {
-    makeAnthropicRequest(request.messages)
-      .then(response => sendResponse({ success: true, data: response }))
-      .catch(error => sendResponse({ success: false, error: error.message }));
+    // Get API key from storage
+    chrome.storage.local.get(['anthropicApiKey'], (result) => {
+      if (!result.anthropicApiKey) {
+        sendResponse({ 
+          success: false, 
+          error: 'API key not found. Please set it in the extension settings.' 
+        });
+        return;
+      }
+      
+      makeAnthropicRequest(request.messages, result.anthropicApiKey)
+        .then(response => sendResponse({ success: true, data: response }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+    });
     return true;
   }
 });
 
-async function makeAnthropicRequest(messages) {
+async function makeAnthropicRequest(messages, apiKey) {
   try {
     const response = await fetch(ANTHROPIC_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true'
       },
@@ -30,7 +40,8 @@ async function makeAnthropicRequest(messages) {
     });
 
     if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || `API error: ${response.status}`);
     }
 
     return await response.json();
@@ -39,4 +50,3 @@ async function makeAnthropicRequest(messages) {
     throw error;
   }
 }
-
