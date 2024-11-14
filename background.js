@@ -7,7 +7,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     makeAnthropicRequest(request.messages)
       .then(response => sendResponse({ success: true, data: response }))
       .catch(error => sendResponse({ success: false, error: error.message }));
-    return true; // Will respond asynchronously
+    return true;
   }
 });
 
@@ -19,7 +19,7 @@ async function makeAnthropicRequest(messages) {
         'Content-Type': 'application/json',
         'x-api-key': ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true' // Add this header
+        'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
         model: "claude-3-haiku-20240307",
@@ -30,15 +30,13 @@ async function makeAnthropicRequest(messages) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
+      throw new Error(`Anthropic API error: ${response.status}`);
     }
 
-    const data = await response.json();
-    console.log('API Response:', data); // Debug log
-    return data;
+    return await response.json();
   } catch (error) {
     console.error('Error in makeAnthropicRequest:', error);
     throw error;
   }
 }
+
