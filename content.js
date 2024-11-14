@@ -138,36 +138,40 @@ async function createAIHelper() {
   }
 
   function createAIButton() {
-      const button = document.createElement('button');
-      button.className = 'ai-helper-button';
-      button.title = 'Get AI Response';
-      button.innerHTML = `
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" fill="#0084ff"/>
-          </svg>
-      `;
+    const button = document.createElement('button');
+    button.className = 'ai-helper-button';
+    button.title = 'AI Response';
+    // Modern AI-themed icon
+    button.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c5.51 0 10-4.48 10-10S17.49 2 12 2zm-1 16h2v-2h-2v2zm3.07-7.75-.9.92C12.45 11.9 12 12.5 12 14h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>
+        </svg>
+    `;
 
-      button.addEventListener('click', async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          const { conversation_history, customerMessage } = getConversationData();
-          
-          console.log('Conversation History:', conversation_history);
-          console.log('Customer Message:', customerMessage);
-          
-          try {
-              writeToChat('Generating response...');
-              const response = await processMessages(customerMessage, JSON.stringify(conversation_history));
-              writeToChat(response);
-          } catch (error) {
-              console.error('Error processing message:', error);
-              writeToChat('Sorry, I encountered an error processing your message.');
-          }
-      });
 
-      return button;
-  }
+    // Add the event listener (same as before)
+    button.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const { conversation_history, customerMessage } = getConversationData();
+        
+        console.log('Conversation History:', conversation_history);
+        console.log('Customer Message:', customerMessage);
+        
+        try {
+            writeToChat('Generating response...');
+            const response = await processMessages(customerMessage, JSON.stringify(conversation_history));
+            writeToChat(response);
+        } catch (error) {
+            console.error('Error processing message:', error);
+            writeToChat('Sorry, I encountered an error processing your message.');
+        }
+    });
+
+    return button;
+}
+
 
   function insertAIHelper() {
       const savedReplyButton = document.querySelector('div[aria-label="Insert saved reply"]');
@@ -176,24 +180,51 @@ async function createAIHelper() {
       }
 
       const aiButton = createAIButton();
-      savedReplyButton.parentElement.insertBefore(aiButton, savedReplyButton.nextSibling);
-  }
+      savedReplyButton.insertAdjacentElement('afterend', aiButton);
+    }
 
-  const style = document.createElement('style');
-  style.textContent = `
-      .ai-helper-button {
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 8px;
-          border-radius: 50%;
-          transition: background-color 0.2s;
-      }
-      .ai-helper-button:hover {
-          background-color: rgba(0, 0, 0, 0.05);
-      }
-  `;
-  document.head.appendChild(style);
+    const style = document.createElement('style');
+    style.textContent = `
+        .ai-helper-button {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 8px;
+            position: relative;
+            vertical-align: middle;
+            width: 32px;
+            height: 32px;
+        }
+        
+        .ai-helper-button:hover {
+            background-color: rgba(0, 132, 255, 0.1);
+        }
+        
+        .ai-helper-button svg {
+            color: #0084ff;
+            width: 20px;
+            height: 20px;
+        }
+        
+        .ai-helper-button:active {
+            transform: scale(0.95);
+        }
+    
+        /* Make sure the button container is inline */
+        div[aria-label="Insert saved reply"] {
+            display: inline-flex;
+        }
+    `;
+    document.head.appendChild(style);
+    
+
+
 
   insertAIHelper();
 
