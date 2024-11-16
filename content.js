@@ -122,11 +122,15 @@ async function createAIHelper() {
 
 function writeToChat(message) {
     try {
-        const textarea = document.querySelector('textarea[placeholder="Reply in Messenger…"]');
+        const textarea = document.querySelector('textarea[placeholder="Reply in Messenger…"], textarea[placeholder="Reply on Instagram…"]');
         if (textarea) {
-            // If the error is about API key, add instructions
-            if (message.includes('API key not found') || message.includes('invalid x-api-key')) {
-                message = 'Please set up your Anthropic API key in the extension settings (click the extension icon in your browser toolbar).';
+            const chatContainer = textarea.closest('.x78zum5');
+            
+            // Add glow effect when generating response
+            if (message === 'Generating response...') {
+                chatContainer?.classList.add('ai-writing');
+            } else {
+                chatContainer?.classList.remove('ai-writing');
             }
             
             textarea.value = message;
@@ -136,6 +140,8 @@ function writeToChat(message) {
             });
             textarea.dispatchEvent(event);
             textarea.focus();
+        } else {
+            console.log('No textarea found with expected placeholder text');
         }
     } catch (error) {
         console.error('Error writing to chat:', error);

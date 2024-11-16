@@ -14,6 +14,11 @@
     width: 32px;
     height: 32px;
 }
+.ai-writing {
+    border: 2px solid #0084ff;
+    box-shadow: 0 0 10px #0084ff, 0 0 20px #0084ff;
+    transition: box-shadow 0.3s ease-in-out, border 0.3s ease-in-out;
+}
 
 .ai-helper-button:hover {
     background-color: rgba(16, 163, 127, 0.1);
