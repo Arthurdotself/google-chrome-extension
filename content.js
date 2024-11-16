@@ -2,17 +2,39 @@
 async function createAIHelper() {
   console.log('Facebook Message Extractor initialized');
 
-  // Define processMessages function
-  async function processMessages(customerMessage, conversation_history) {
-      try {
-          // Dynamically import the anthropicService module
-          const { generateFullResponse } = await import(chrome.runtime.getURL('anthropicService.js'));
-          return await generateFullResponse(customerMessage, conversation_history);
-      } catch (error) {
-          console.error('Error in processMessages:', error);
-          return 'Sorry, I encountered an error processing your message.';
-      }
-  }
+    // Define processMessages function
+    async function processMessages(customerMessage, conversation_history) {
+        try {
+            // Dynamically import the anthropicService module
+            const { generateFullResponse, identifyProductInMessage } = await import(chrome.runtime.getURL('anthropicService.js'));
+            
+            // First identify products in the message
+            const productInfo = await identifyProductInMessage(customerMessage, conversation_history);
+            console.log('Product identification results:', productInfo);
+            
+            // Initialize productDataString
+            let productDataString = '';
+            
+            // If products were identified and need more info, format the product data
+            if (productInfo && productInfo.needsInfoToAnswer && productInfo.productsData) {
+                // Format product data for inclusion in the prompt
+                productDataString = JSON.stringify(productInfo.productsData, null, 2);
+                console.log('Formatted product data:', productDataString);
+            }
+            
+            // Then generate the full response with the enhanced context
+            // Pass product data string as the third parameter
+            return await generateFullResponse(
+                customerMessage, 
+                conversation_history,
+                productDataString
+            );
+        } catch (error) {
+            console.error('Error in processMessages:', error);
+            return 'Sorry, I encountered an error processing your message.';
+        }
+    }
+  
 
   function extractMessages() {
       const messageSelectors = [
@@ -88,31 +110,28 @@ async function createAIHelper() {
 
   function getConversationData() {
     const messages = extractMessages();
-    
+    console.log("extractMessages:",messages,"/extractMessages")
     // Find index of our last response
     const lastBotIndex = messages.findIndex(msg => msg.isBot);
     
-    // Get all messages after our last response
-    const messagesAfterBot = lastBotIndex >= 0 
+    // Get all messages after our last response as customerMessage
+    const unansweredMessages = lastBotIndex >= 0 
         ? messages.slice(lastBotIndex + 1).filter(msg => !msg.isBot)
         : messages.filter(msg => !msg.isBot);
     
-    // Combine all customer messages after our last response into one string
-    const customerMessage = messagesAfterBot
+    // Combine all unanswered messages into customerMessage
+    const customerMessage = unansweredMessages
         .map(msg => msg.text)
         .join('\n');
     
-    // For conversation history, get the last customer message text up to 100 chars
-    const lastCustomerMessage = messagesAfterBot[messagesAfterBot.length - 1]?.text || '';
-    const conversation_history = [{
-        role: 'user',
-        content: lastCustomerMessage.slice(-100),
-        timestamp: messagesAfterBot[messagesAfterBot.length - 1]?.timestamp || '',
-        sender: messagesAfterBot[messagesAfterBot.length - 1]?.sender || ''
-    }];
-
-    console.log('Customer Message (all messages after last bot response):', customerMessage);
-    console.log('Conversation History (last customer message up to 100 chars):', conversation_history);
+    // Get all messages before the unanswered ones as conversation_history
+    const historyMessages = lastBotIndex >= 0 
+        ? messages.slice(0, lastBotIndex + 1)
+        : [];
+    
+    const conversation_history = historyMessages
+        .map(msg => msg.text)
+        .join('\n');
 
     return {
         conversation_history,

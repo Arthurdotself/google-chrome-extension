@@ -56,20 +56,12 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                                 "needsInfoToAnswer": false
                             }
 
-                            For "What's the warranty on iPhone, iPad and MacBook?":
-                            {
-                                "productNames": ["iPhone", "iPad", "MacBook"],
-                                "needsInfoToAnswer": true
-                            }
-
                             Respond only with the JSON format, no additional explanation.`
             }
         ]);
 
         // Get the text content from the response
         const responseText = response.content[0].text.trim();
-        
-        // Log the response for debugging
         console.log('Raw AI response:', responseText);
 
         try {
@@ -89,9 +81,44 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                 throw new Error('needsInfoToAnswer is not a boolean');
             }
 
-            // If additional product info is needed, search WooCommerce for each product
+            // If additional product info is needed, search for variations
             if (parsedResponse.needsInfoToAnswer) {
                 const productsData = [];
+                
+                // Get stored product variations
+                const result = await chrome.storage.local.get(['productVariations']);
+                const variations = result.productVariations || [];
+                
+                // Function to normalize text for comparison
+                const normalizeText = (text) => {
+                    return text.toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')  // Replace non-alphanumeric chars with hyphen
+                        .replace(/^-+|-+$/g, '')      // Remove leading/trailing hyphens
+                        .trim();
+                };
+
+                // Function to check if strings are similar enough
+                const isSimilarEnough = (str1, str2) => {
+                    const norm1 = normalizeText(str1);
+                    const norm2 = normalizeText(str2);
+                    
+                    // Check for exact match after normalization
+                    if (norm1 === norm2) return true;
+                    
+                    // Check if one contains the other
+                    if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+
+                    // Check for product name with number (e.g., "iphone 14" matches "iphone-14-pro")
+                    const words1 = norm1.split('-');
+                    const words2 = norm2.split('-');
+                    
+                    // If first two words match (e.g., "iphone" and "14"), consider it a match
+                    if (words1.length >= 2 && words2.length >= 2) {
+                        return words1[0] === words2[0] && words1[1] === words2[1];
+                    }
+
+                    return false;
+                };
                 
                 // Get data for each product
                 for (const productName of parsedResponse.productNames) {
@@ -99,18 +126,17 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                         console.log('Searching for product:', productName);
                         
                         try {
-                            // Send message to background script to search WooCommerce
-                            const response = await chrome.runtime.sendMessage({
-                                type: 'searchWooCommerceProducts',
-                                searchTerm: productName
+                            // Search for matching products
+                            const matchingProducts = variations.filter(p => 
+                                isSimilarEnough(p.slug, productName));
+                            
+                            // Add all matching products to the results
+                            matchingProducts.forEach(product => {
+                                productsData.push(compressProduct({
+                                    slug: product.slug,
+                                    variations: product.variations                                  
+                                }));
                             });
-
-                            if (response && response.success && response.data) {
-                                productsData.push({
-                                    searchTerm: productName,
-                                    results: response.data
-                                });
-                            }
                         } catch (error) {
                             console.error(`Error searching for product ${productName}:`, error);
                         }
@@ -145,9 +171,12 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
 }
 
 
-async function generateFullResponse(customerMessage, conversationHistory) {
+async function generateFullResponse(customerMessage, conversationHistory , productInfo) {
     try {
         let formattedHistory = '';
+        const storage2 = await chrome.storage.local.get(['productSlugs']);
+        const productSlugs = storage2.productSlugs ? storage2.productSlugs.join(', ') : '';
+
         try {
             if (typeof conversationHistory === 'string') {
                 formattedHistory = conversationHistory;
@@ -164,72 +193,23 @@ async function generateFullResponse(customerMessage, conversationHistory) {
         }
 
         // First check if API key is set
-        const storage = await chrome.storage.local.get(['anthropicApiKey']);
-        if (!storage.anthropicApiKey) {
+        const storage1 = await chrome.storage.local.get(['anthropicApiKey']);
+        if (!storage1.anthropicApiKey) {
             throw new Error('API key not found. Please set it in the extension settings.');
         }
 
         const messages = [{
             role: "user",
             content: `You are an AI assistant for iCenter, an authorized Apple reseller and service provider in Iraq Kurdistan. Your task is to respond to customer messages on the company account. Here is the essential information about the company and its products:
+                      Your primary goal is to make sales while providing excellent customer service. but dont push it so hard. You should be helpful and informative, but always look for opportunities to promote products and services. Feel free to be creative in your approach to making a sale, including asking questions, making suggestions, or recommending alternative products if appropriate.
 
                       <company_info>
-                     iCenter AI Customer Support Response Guide 1. Product Information & Warranty Product Authentication  All products are official Middle East versions Come with manufacturer warranty:  iPhone: 2 years warranty Mac: 1 year warranty + English/Arabic Keyboard + Educational Offer iPad: 1 year replacement warranty AirPods: 1 year replacement warranty Watch: 1 year warranty Accessories: 1 year warranty + MFi Certification   All repairs by Apple-certified technicians using genuine parts 3-months warranty on replaced parts  iPhone Features  Dual SIM: 1 physical SIM + 1 eSIM Up to 8 eSIMs can be stored Enhanced security features - cannot be removed Myth clarification: eSIM does not cause device overheating  2. Delivery & Payment Delivery Policy  Orders above 50,000 IQD: Free delivery Orders below 50,000 IQD: 5,000 IQD fee Delivery time: 3-5 working days Cash on delivery available  Payment Options  Cash on delivery Credit Card FIB Installments through Miswag (Qi Card holders) Visit: https://miswag.com/merchant/icenter  Trade-in Services  Available for: Phones, Laptops, Tablets Not eligible: AirPods Instant price estimate: https://tradein.icenter-iraq.com/ir-en/  3. Locations & Contact Information Erbil (Main)  Location: Ankawa - Bakhtiari Road Showroom: 9:00 AM - 11:00 PM daily Service: 9:00 AM - 5:00 PM (Thu: 9:00 AM - 1:00 PM, Fri: Closed) Contacts:  Showroom: 0751 7418146 Sales: 07508942096 Service: 07502347717 Bazaar Support: 07503116716   Link: https://g.page/r/CXfdCsQBBjaUEAo  Baghdad  Location: Al-Zayyouna - Al-Rubaie Street Showroom: 10:00 AM - 11:00 PM (Fri: Closed) Service: 10:00 AM - 6:00 PM (Fri: Closed) Contacts:  Showroom: 07707071307 Service: 07727854040   Link: https://g.page/r/CQN3vQVtdD0pEAo  Sulaymaniyah  Bakhtiari Branch:  Location: Near Talari Honar Hours: 9:00 AM - 11:00 PM daily Contacts:  Showroom: 07727851010 Sales: 07508942096 Mawlawi Support: 07700834666   No Service Department Link: https://g.page/r/CUUuoTpLgJWnEAo   King Mahmoud Branch:  Location: Zargata Bridge Service: 9:00 AM - 5:00 PM (Thu: 9:00 AM - 1:00 PM, Fri: Closed) Contacts:  Sales: 07727856060 Service: 07727852020   Link: https://maps.app.goo.gl/FdYh2Uj7Vi9MSR1q8    Duhok  Location: Opposite Judy Restaurant Showroom: 9:00 AM - 11:00 PM daily Service: 9:00 AM - 5:00 PM (Thu: 9:00 AM - 1:00 PM, Fri: Closed) Contacts:  Showroom: 0751 741 8151 Sales: 07508942096 Service: 07503303141   Link: https://g.page/r/CUTb5TGpqtr1EAo  4. Additional Support  Online Sales: 07508942096 B2B Inquiries: 07505122022 Marketing: 07509849454  5. Warranty Coverage Details  Duration: As per product specification Covered:  Manufacturing defects Normal functionality issues   Not covered:  Physical damage Water damage Misuse   Special notes:  iPads and AirPods: Replacement warranty Other products: Repair warranty    6. Product Availability Status In Stock  Online order + free delivery Pick-up reservation available  Out of Stock  Alternative variation suggestions Alternative product recommendations Backorder options Out of production explanations with alternative suggestions  7. Service Quality Assurance  All repairs performed by Apple-certified technicians Only genuine Apple parts and tools used 3-months warranty on all replaced parts Service quality guaranteed .  ### Response Guidelines  1. Always greet the customer professionally 2. Identify the main inquiry category 3. Use the appropriate template as a base 4. Customize the response based on specific customer needs 5. Include relevant contact information 6. End with an offer for additional assistance  ### Service Escalation Protocol   If a customer's query involves:  1. Complex technical issues: Direct to relevant service department  2. Delivery delays: Acknowledge and provide tracking information   3. Warranty disputes: Escalate to service department 4. Payment issues: Direct to relevant showroom  5. B2B requests: Forward to B2B team (07505122022)    ### Response Best Practices  1. **Accuracy**: Double-check all numbers and prices before sending  2. **Clarity**: Use clear, simple language 3. **Completeness**: Include all relevant information in one response 4. **Timeliness**: Mention business hours when scheduling visits  5. **Follow-up**: Offer additional assistance   6. **Politeness**: Maintain professional courtesy regardless of customer tone
+                     iCenter AI Customer Support Response Guide 1. Product Information & Warranty Product Authentication  All products are official Middle East versions Come with manufacturer warranty:  iPhone: 2 years warranty Mac: 1 year warranty + English/Arabic Keyboard + Educational Offer iPad: 1 year replacement warranty AirPods: 1 year replacement warranty Watch: 1 year warranty Accessories: 1 year warranty + MFi Certification   All repairs by Apple-certified technicians using genuine parts 3-months warranty on replaced parts  iPhone Features  Dual SIM: 1 physical SIM + 1 eSIM Up to 8 eSIMs can be stored Enhanced security features - cannot be removed Myth clarification: eSIM does not cause device overheating  2. Delivery & Payment Delivery Policy  Orders above 50,000 IQD: Free delivery Orders below 50,000 IQD: 5,000 IQD fee Delivery time: 3-5 working days Cash on delivery available  Payment Options  Cash on delivery Credit Card FIB Installments through Miswag (Qi Card holders) Visit: https://miswag.com/merchant/icenter  Trade-in Services  Available for: Phones, Laptops, Tablets Not eligible: AirPods Instant price estimate: https://tradein.icenter-iraq.com/ir-en/  3. Locations & Contact Information Erbil (Main)  Location: Ankawa - Bakhtiari Road Showroom: 9:00 AM - 11:00 PM daily Service: 9:00 AM - 5:00 PM (Thu: 9:00 AM - 1:00 PM, Fri: Closed) Contacts:  Showroom: 0751 7418146 Sales: 07508942096 Service: 07502347717 Bazaar Support: 07503116716   Link: https://g.page/r/CXfdCsQBBjaUEAo  Baghdad  Location: Al-Zayyouna - Al-Rubaie Street Showroom: 10:00 AM - 11:00 PM (Fri: Closed) Service: 10:00 AM - 6:00 PM (Fri: Closed) Contacts:  Showroom: 07707071307 Service: 07727854040   Link: https://g.page/r/CQN3vQVtdD0pEAo  Sulaymaniyah  Bakhtiari Branch:  Location: Near Talari Honar Hours: 9:00 AM - 11:00 PM daily Contacts:  Showroom: 07727851010 Sales: 07508942096 Mawlawi Support: 07700834666   No Service Department Link: https://g.page/r/CUUuoTpLgJWnEAo   King Mahmoud Branch:  Location: Zargata Bridge Service: 9:00 AM - 5:00 PM (Thu: 9:00 AM - 1:00 PM, Fri: Closed) Contacts:  Sales: 07727856060 Service: 07727852020   Link: https://maps.app.goo.gl/FdYh2Uj7Vi9MSR1q8    Duhok  Location: Opposite Judy Restaurant Showroom: 9:00 AM - 11:00 PM daily Service: 9:00 AM - 5:00 PM (Thu: 9:00 AM - 1:00 PM, Fri: Closed) Contacts:  Showroom: 0751 741 8151 Sales: 07508942096 Service: 07503303141   Link: https://g.page/r/CUTb5TGpqtr1EAo  4. Additional Support  Online Sales: 07508942096 B2B Inquiries: 07505122022 Marketing: 07509849454  5. Warranty Coverage Details  Duration: As per product specification Covered:  Manufacturing defects Normal functionality issues   Not covered:  Physical damage Water damage Misuse   Special notes:  iPads and AirPods: Replacement warranty Other products: Repair warranty    6. Product Availability Status In Stock  Online order + free delivery Pick-up reservation available  Out of Stock  Alternative variation suggestions Alternative product recommendations Backorder options Out of production explanations with alternative suggestions  7. Service Quality Assurance  All repairs performed by Apple-certified technicians Only genuine Apple parts and tools used 3-months warranty on all replaced parts Service quality guaranteed . B2B requests: Forward to B2B team (07505122022)
+                      </company_info>
 
-                      <products slug>
-                     iphone-16/
-iphone-16-plus/
-iphone-16-pro/
-iphone-16-pro-max/
-apple-watch-series-10/
-apple-watch-ultra-2-new/
-apple-watch-se-new/
-airpods-max-new/
-ipad-air-11-inch-m2/
-ipad-air-13-inch-m2/
-ipad-pro-11-inch-m4/
-ipad-pro-13-inch-m4/
-macbook-air-15-inch-m3/
-macbook-air-13-inch-m3/
-macbook-pro-16-inch-m3-pro-or-m3-max/
-macbook-pro-14-inch-m3-pro-or-m3-max/
-imac-24-inch-m3/
-apple-watch-se/
-macbook-pro-14-inch-m3/
-airpods-max/
-apple-watch-ultra-2/
-apple-watch-series-9/
-iphone-15-plus/
-iphone-15-pro/
-iphone-15/
-iphone-15-pro-max/
-apple-watch-se-2nd-generation/
-apple-watch-series-8/
-apple-watch-ultra-1/
-ipad-mini-6th-generation/
-ipad-9th-generation/
-ipad-10th-generation/
-ipad-air-5th-generation/
-ipad-pro-11-inch-4th-generation/
-ipad-pro-12-9-inch-6th-generation/
-iphone-14-pro-max/
-iphone-14-pro/
-iphone-14-plus/
-iphone-14/
-iphone-13/
-iphone-12/
-iphone-11/
-mac-mini-m2-or-m2-pro/
-imac-24-inch-m1/
-macbook-pro-13-inch-m2/
-macbook-pro-16-inch-m2-pro-or-m2-max/
-macbook-pro-14-inch-m2-pro-or-m2-max/
-macbook-air-13-inch-m1/
-macbook-air-13-inch-m2/
-macbook-air-15-inch-m2/
-                      </products slug>
-
-                      Your primary goal is to make sales while providing excellent customer service. but dont push it so hard. You should be helpful and informative, but always look for opportunities to promote products and services. Feel free to be creative in your approach to making a sale, including asking questions, making suggestions, or recommending alternative products if appropriate.
+                      <products_slug>
+                     ${productSlugs}
+                      </products_slug>
 
                       <customer_message>
                       ${customerMessage}
@@ -240,6 +220,14 @@ macbook-air-15-inch-m2/
                       ${conversationHistory}
                       </conversation_history>
 
+                      productInfo format:          
+                      ["Variation Name", "price", stockStatus],
+                      ["Another Variation", "price", stockStatus]
+                      <productInfo>
+                      ${productInfo}
+                      </productInfo>
+                      
+
                       When responding to the customer:
 
                       1. Analyze the customer's message and the conversation history to understand their needs and interests.
@@ -249,38 +237,31 @@ macbook-air-15-inch-m2/
                       5. Use a friendly, helpful tone while maintaining a focus on making a sale.
                       6. Feel free to ask questions or make suggestions that could lead to a sale.
                       7. If appropriate, recommend alternative devices or services that might better suit the customer's needs.
-                      9. For ANY questions about pricing, availability, specifications, or features, ALWAYS include the relevant product page link: https://www.icenter-iraq.com/[product-slug]                    10. Never guess or make assumptions about prices or availability.
-                     11. Only provide information or links that is explicitly present in the data
-                     12. If pricing or product details are unclear, say "Please click on the link for current pricing and availability".
-                    
-                     IMPORTANT RULES:
-                    - NEVER provide specific prices for any products
-                    - NEVER make assumptions about product availability
-                    - ONLY use information explicitly provided in the data above
-                    - For ALL pricing and availability questions, direct customers to: https://www.icenter-iraq.com/[product-slug]
-                    
-                    For pricing questions:
-                     "Please check current pricing at: https://www.icenter-iraq.com/[product-slug]"
-
-                      For availability questions:
-                      "For real-time availability, please visit: https://www.icenter-iraq.com/[product-slug]"
+                      9. For ANY questions about pricing, availability, specifications, or features, ALWAYS include the relevant product page link: https://www.icenter-iraq.com/[product-slug]                    
+                      10. Never guess or make assumptions about prices or availability.
+                      11. Only provide information or links that is explicitly present in the data
+                      12. If pricing or product details are unclear, say "Please click on the link for current pricing and availability".
+                      13. Delivery delays: Acknowledge and provide tracking information
+                      14. Maintain professional courtesy regardless of customer tone
+                      15. Mention business hours when scheduling visits  
+                      16. ONLY use information explicitly provided in the data above
+                      17. For ordering direct the customer visit: https://www.icenter-iraq.com/[product-slug]"
                       Format your response as follows:
 
                       <answer>
-                      [Your response to the customer here , with the URL of the product or page if needed] must be under 100 characters
+                      [Your response to the customer in ckb or Arabic or English, with the URL of the product or page if needed] must be under 150 characters
                       </answer>
 
                      Before sending your response, verify:
-                    - Does my response include any specific prices? If yes, remove them
-                    - Did I make any assumptions about availability? If yes, remove them
-                    - Is all information coming directly from the provided data? If no, remove external information
-                    - Have I included the correct website link? If no, add it
-                      Remember, your main goal is to make sales while providing helpful information to the customer. Be creative and persuasive in your approach, and don't hesitate to guide the conversation towards a potential sale. must be under 100 characters
+                    - Have I included the correct website link? If no, add it.
+                    
+                      **REMEMBER, your main goal is to make sales while providing helpful information to the customer. Be creative and persuasive in your approach, and don't hesitate to guide the conversation towards a potential sale.** 
+                      must be under 150 characters
 `
         }];
 
         const response = await makeAnthropicRequest(messages);
-
+        console.log("The input to generateFullResponse :",messages[0].content);
         if (response && response.content && response.content[0] && response.content[0].text) {
             const text = response.content[0].text;
             const match = text.match(/<answer>(.*?)<\/answer>/s);
@@ -297,7 +278,21 @@ macbook-air-15-inch-m2/
     }
 }
 
+function compressProduct(product) {
+    return [
+      product.slug,  // [0] product slug
+      product.variations.map(v => [
+        v.name,           // [0] full variation name
+        `${v.price}IQD`,  // [1] price with currency
+        v.stock_status === 'instock' ? 1 : 0  // [2] stock status (1=in stock, 0=out of stock)
+      ])
+    ];
+  }
+  
+
+
 export {
-    generateFullResponse
+    generateFullResponse,
+    identifyProductInMessage
 };
 

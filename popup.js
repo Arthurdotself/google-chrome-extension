@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   );
 
-  // Save credentials
+  // Save credentials and refresh products
   saveButton.addEventListener('click', async () => {
     const apiKey = apiKeyInput.value.trim();
     const wooKey = wooKeyInput.value.trim();
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         wooCommerceSecret: wooSecret
       });
 
-      // Then test the WooCommerce connection
+      // Then test the WooCommerce connection and fetch products
       try {
         showStatus('Testing connection...', 'status');
 
@@ -78,7 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Connection test response:', response);
 
         if (response.success) {
-          showStatus('Settings saved successfully!', 'success');
+          await fetchAndStoreProducts(wooKey, wooSecret);
+          showStatus('Settings saved and products updated!', 'success');
           console.log('WooCommerce test successful:', response.data);
         } else {
           throw new Error(response.error || 'Connection failed');
@@ -95,21 +96,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function testWooCommerceConnection(wooKey, wooSecret) {
-  // Create URL with authentication
   const baseUrl = 'https://www.icenter-iraq.com/wp-json/wc/v3/products';
   const url = new URL(baseUrl);
   url.searchParams.append('consumer_key', wooKey);
   url.searchParams.append('consumer_secret', wooSecret);
-  url.searchParams.append('per_page', '1'); // Just request one product to test
+  url.searchParams.append('per_page', '1');
 
   try {
-    console.log('Testing WooCommerce connection to:', url.toString());
-    
     const response = await fetch(url.toString());
-    console.log('Connection test status:', response.status);
-    
     const text = await response.text();
-    console.log('Connection test response:', text);
 
     if (!response.ok) {
       throw new Error(`API Error: ${response.status} - ${text}`);
@@ -127,27 +122,119 @@ async function testWooCommerceConnection(wooKey, wooSecret) {
   }
 }
 
+
+async function fetchAndStoreProducts(wooKey, wooSecret) {
+  const baseUrl = 'https://www.icenter-iraq.com/wp-json/wc/v3/products';
+  const categoryIds = [21, 22, 23, 24];
+  let allProducts = [];
+
+  // First fetch all products from categories
+  for (const categoryId of categoryIds) {
+    try {
+      const url = new URL(baseUrl);
+      url.searchParams.append('consumer_key', wooKey);
+      url.searchParams.append('consumer_secret', wooSecret);
+      url.searchParams.append('category', categoryId);
+      url.searchParams.append('per_page', '100');
+      
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const products = await response.json();
+      allProducts = [...allProducts, ...products];
+    } catch (error) {
+      console.error(`Error fetching category ${categoryId}:`, error);
+      throw error;
+    }
+  }
+
+  // Remove duplicates based on slug
+  allProducts = Array.from(new Set(allProducts.map(p => p.slug)))
+    .map(slug => allProducts.find(p => p.slug === slug));
+
+  // Store slugs first
+  const allSlugs = allProducts.map(product => product.slug);
+  await chrome.storage.local.set({ productSlugs: allSlugs });
+  console.log('Stored product slugs:', allSlugs);
+
+  // Then fetch variations for variable products
+  const variations = [];
+  for (const product of allProducts) {
+    if (product.type === 'variable') {
+      try {
+        const productVariations = await fetchProductVariations(wooKey, wooSecret, product.id);
+        if (productVariations.length > 0) {
+          variations.push({
+            slug: product.slug,
+            variations: productVariations
+          });
+        }
+      } catch (error) {
+        console.error(`Error fetching variations for product ${product.slug}:`, error);
+      }
+    }
+  }
+
+  // Store the variations
+  await chrome.storage.local.set({ productVariations: variations });
+  console.log('Stored productVariations structure:', JSON.stringify(variations, null, 2));
+  console.log('Number of products with variations:', variations.length);
+  variations.forEach(product => {
+    console.log(`Product ${product.slug}:`, {
+      numberOfVariations: product.variations.length,
+      variationExample: product.variations[0]
+    });
+  });
+    
+  return { slugs: allSlugs, variations };
+}
+
+async function fetchProductVariations(wooKey, wooSecret, productId) {
+  const baseUrl = `https://www.icenter-iraq.com/wp-json/wc/v3/products/${productId}/variations`;
+  const url = new URL(baseUrl);
+  url.searchParams.append('consumer_key', wooKey);
+  url.searchParams.append('consumer_secret', wooSecret);
+  url.searchParams.append('per_page', '100');
+
+  try {
+    const response = await fetch(url.toString());
+    
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`);
+    }
+
+    const variations = await response.json();
+    const mappedVariations = variations.map(variation => ({
+     // id: variation.id,
+      name: variation.name || '',
+      price: variation.price,
+      stock_status: variation.stock_status
+    }));
+
+    console.log('Processed variations:', mappedVariations);
+    return mappedVariations;
+  } catch (error) {
+    console.error(`Error fetching variations for product ${productId}:`, error);
+    return [];
+  }
+}
+
+
 function showStatus(message, type) {
   const statusElement = document.getElementById('status');
   statusElement.textContent = message;
   statusElement.className = 'status ' + type;
   
-  // Reset animation
-  statusElement.style.animation = 'none';
-  statusElement.offsetHeight; // Trigger reflow
-  statusElement.style.animation = null;
-  
-  // Show status with animation
   statusElement.style.opacity = '1';
   statusElement.style.transform = 'translateY(0)';
   
-  // Only hide success messages after delay
   if (type === 'success') {
     setTimeout(() => {
       statusElement.style.opacity = '0';
       statusElement.style.transform = 'translateY(-10px)';
-      
-      // Reset status after fade out
       setTimeout(() => {
         statusElement.className = 'status';
       }, 300);

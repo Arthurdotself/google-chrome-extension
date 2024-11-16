@@ -2,7 +2,9 @@
   "manifest_version": 3,
   "name": "Messenger AI Helper",
   "version": "1.0",
-  "description": "Adds an AI helper button to Facebook Messenger",
+  "author": "Mustafa Ahmed",
+  "homepage_url": "https://www.icenter-iraq.com",
+  "description": "Enhance your Facebook Messenger experience with an intelligent AI assistant. Get smart suggestions, writing help, and quick responses with just one click. Makes your messaging more efficient and effective.",
   "permissions": [
     "activeTab",
     "storage"
