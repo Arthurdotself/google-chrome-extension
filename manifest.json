@@ -10,7 +10,8 @@
   "host_permissions": [
     "https://*.anthropic.com/*",
     "*://*.facebook.com/*",
-    "*://*.messenger.com/*"
+    "*://*.messenger.com/*",
+    "https://*.icenter-iraq.com/*"
   ],
   "action": {
     "default_popup": "popup.html",

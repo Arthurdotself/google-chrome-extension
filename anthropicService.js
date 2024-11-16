@@ -19,6 +19,131 @@ async function makeAnthropicRequest(messages) {
         throw error;
     }
 }
+async function identifyProductInMessage(customerMessage, conversation_history) {
+    try {
+        const response = await makeAnthropicRequest([
+            {
+                role: "user",
+                content: `Analyze customer messages to determine if they're inquiring about Apple products and if additional product information is needed.
+                            Review both the conversation history and customer message:
+                            <conversation_history>
+                            ${conversation_history}
+                            </conversation_history>
+                            <customer_message>
+                            ${customerMessage}
+                            </customer_message>
+                            Return a JSON response with:
+
+                            productNames: Array of Apple products mentioned/implied (e.g., ["iPhone", "iPad", "MacBook"]) or ["None"]
+                            needsInfoToAnswer: true if additional product details needed (price, availability, specs), false otherwise
+
+                             Include:
+                            - Existing Apple products
+                            - Possible misspellings
+                            - Rumored/future products
+                            - Any tech that could be Apple-related
+
+                            Example responses:
+                            For "What's the price difference between iPhone and iPad?":
+                            {
+                                "productNames": ["iPhone", "iPad"],
+                                "needsInfoToAnswer": true
+                            }
+
+                            For "How do I turn on my iPad?":
+                            {
+                                "productNames": ["iPad"],
+                                "needsInfoToAnswer": false
+                            }
+
+                            For "What's the warranty on iPhone, iPad and MacBook?":
+                            {
+                                "productNames": ["iPhone", "iPad", "MacBook"],
+                                "needsInfoToAnswer": true
+                            }
+
+                            Respond only with the JSON format, no additional explanation.`
+            }
+        ]);
+
+        // Get the text content from the response
+        const responseText = response.content[0].text.trim();
+        
+        // Log the response for debugging
+        console.log('Raw AI response:', responseText);
+
+        try {
+            // Parse the JSON response
+            const parsedResponse = JSON.parse(responseText);
+            
+            // Validate the response structure
+            if (!parsedResponse || typeof parsedResponse !== 'object') {
+                throw new Error('Response is not an object');
+            }
+
+            if (!Array.isArray(parsedResponse.productNames)) {
+                throw new Error('productNames is not an array');
+            }
+
+            if (typeof parsedResponse.needsInfoToAnswer !== 'boolean') {
+                throw new Error('needsInfoToAnswer is not a boolean');
+            }
+
+            // If additional product info is needed, search WooCommerce for each product
+            if (parsedResponse.needsInfoToAnswer) {
+                const productsData = [];
+                
+                // Get data for each product
+                for (const productName of parsedResponse.productNames) {
+                    if (productName !== "None") {
+                        console.log('Searching for product:', productName);
+                        
+                        try {
+                            // Send message to background script to search WooCommerce
+                            const response = await chrome.runtime.sendMessage({
+                                type: 'searchWooCommerceProducts',
+                                searchTerm: productName
+                            });
+
+                            if (response && response.success && response.data) {
+                                productsData.push({
+                                    searchTerm: productName,
+                                    results: response.data
+                                });
+                            }
+                        } catch (error) {
+                            console.error(`Error searching for product ${productName}:`, error);
+                        }
+                    }
+                }
+                
+                console.log('Got product data:', productsData);
+                
+                return {
+                    needsInfoToAnswer: true,
+                    productNames: parsedResponse.productNames,
+                    productsData: productsData
+                };
+            } else {
+                return {
+                    needsInfoToAnswer: false
+                };
+            }
+
+        } catch (parseError) {
+            console.error('Error processing response:', parseError);
+            console.error('Response text was:', responseText);
+            return {
+                needsInfoToAnswer: false
+            };
+        }
+        
+    } catch (error) {
+        console.error('Error in product identification:', error);
+        throw error;
+    }
+}
+
 
 async function generateFullResponse(customerMessage, conversationHistory) {
     try {

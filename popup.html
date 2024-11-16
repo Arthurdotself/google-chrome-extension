@@ -40,8 +40,20 @@
       -webkit-text-fill-color: transparent;
     }
     
+    .section-title {
+      font-size: 14px;
+      color: var(--arc-text-secondary);
+      margin: 24px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--arc-border);
+    }
+
+    .section-title:first-of-type {
+      margin-top: 0;
+    }
+    
     .input-group {
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     
     label {
@@ -127,14 +139,12 @@
       transform: translateY(0);
     }
 
-    /* Save icon */
     .save-icon {
       width: 16px;
       height: 16px;
       fill: currentColor;
     }
 
-    /* Subtle gradient border */
     .container::before {
       content: '';
       position: absolute;
@@ -147,18 +157,53 @@
         rgba(138, 79, 255, 0.3)
       );
     }
+
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-1px, 0, 0); }
+      20%, 80% { transform: translate3d(2px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+      40%, 60% { transform: translate3d(4px, 0, 0); }
+    }
+
+    .shake {
+      animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>AI Helper Settings</h2>
     
+    <div class="section-title">Anthropic API</div>
     <div class="input-group">
-      <label for="apiKey">Anthropic API Key</label>
+      <label for="apiKey">API Key</label>
       <input 
         type="password" 
         id="apiKey" 
         placeholder="Enter your API key (sk-ant...)" 
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
+
+    <div class="section-title">WooCommerce API</div>
+    <div class="input-group">
+      <label for="wooKey">Consumer Key</label>
+      <input 
+        type="password" 
+        id="wooKey" 
+        placeholder="Enter your consumer key" 
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
+    
+    <div class="input-group">
+      <label for="wooSecret">Consumer Secret</label>
+      <input 
+        type="password" 
+        id="wooSecret" 
+        placeholder="Enter your consumer secret" 
         autocomplete="off"
         spellcheck="false"
       />
