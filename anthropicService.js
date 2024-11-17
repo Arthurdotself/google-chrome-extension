@@ -44,15 +44,15 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                             - Any tech that could be Apple-related
 
                             Example responses:
-                            For "What's the price difference between iPhone and iPad?":
+                            For "What's the price difference between iPhone 15 and iPad pro 13 inch?":
                             {
-                                "productNames": ["iPhone", "iPad"],
+                                "productNames": ["iPhone 15", "iPad pro 13 inch"],
                                 "needsInfoToAnswer": true
                             }
 
-                            For "How do I turn on my iPad?":
+                            For "How do I turn on my iPad air?":
                             {
-                                "productNames": ["iPad"],
+                                "productNames": ["iPad air"],
                                 "needsInfoToAnswer": false
                             }
 

@@ -1,9 +1,135 @@
 // popup.js
+// AIEffect class definition
+class AIEffect {
+  constructor() {
+    this.container = document.getElementById('aiEffectContainer');
+    this.isAnimating = false;
+  }
+
+  createParticle(x, y) {
+    const particle = document.createElement('div');
+    particle.className = 'particle';
+    
+    const size = Math.random() * 10 + 5;
+    particle.style.width = `${size}px`;
+    particle.style.height = `${size}px`;
+    
+    particle.style.left = `${x}px`;
+    particle.style.top = `${y}px`;
+    
+    const tx = (Math.random() - 0.5) * 200;
+    const ty = (Math.random() - 0.5) * 200;
+    particle.style.setProperty('--tx', `${tx}px`);
+    particle.style.setProperty('--ty', `${ty}px`);
+    
+    particle.style.animation = `particleAnimation ${Math.random() * 1 + 0.5}s ease-out forwards`;
+    
+    this.container.appendChild(particle);
+    setTimeout(() => particle.remove(), 1500);
+  }
+
+  createEnergyRing(x, y) {
+    const ring = document.createElement('div');
+    ring.className = 'energy-ring';
+    
+    const size = 60;
+    ring.style.width = `${size}px`;
+    ring.style.height = `${size}px`;
+    ring.style.left = `${x - size/2}px`;
+    ring.style.top = `${y - size/2}px`;
+    
+    ring.style.animation = 'ringExpand 1s ease-out forwards';
+    
+    this.container.appendChild(ring);
+    setTimeout(() => ring.remove(), 1000);
+  }
+
+  createPowerWave(y) {
+    const wave = document.createElement('div');
+    wave.className = 'power-wave';
+    wave.style.top = `${y}px`;
+    wave.style.animation = 'powerWave 0.8s ease-out forwards';
+    
+    this.container.appendChild(wave);
+    setTimeout(() => wave.remove(), 800);
+  }
+
+  createCircuitLine(x, y, width, height) {
+    const line = document.createElement('div');
+    line.className = 'circuit-line';
+    line.style.left = `${x}px`;
+    line.style.top = `${y}px`;
+    line.style.width = `${width}px`;
+    line.style.height = `${height}px`;
+    line.style.animation = 'circuitFlow 0.6s ease-out forwards';
+    
+    this.container.appendChild(line);
+    setTimeout(() => line.remove(), 600);
+  }
+
+  async activate(buttonElement) {
+    if (this.isAnimating) return;
+    this.isAnimating = true;
+    
+    const rect = buttonElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    this.container.classList.add('active');
+    buttonElement.classList.add('power-active');
+    
+    // Create initial burst
+    for (let i = 0; i < 20; i++) {
+      this.createParticle(centerX, centerY);
+    }
+    
+    // Create expanding rings
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        this.createEnergyRing(centerX, centerY);
+      }, i * 200);
+    }
+    
+    // Create power waves
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        this.createPowerWave(Math.random() * window.innerHeight);
+      }, i * 150);
+    }
+    
+    // Create circuit lines
+    for (let i = 0; i < 8; i++) {
+      setTimeout(() => {
+        const isHorizontal = Math.random() > 0.5;
+        const width = isHorizontal ? Math.random() * 100 + 50 : 2;
+        const height = isHorizontal ? 2 : Math.random() * 100 + 50;
+        const x = Math.random() * window.innerWidth;
+        const y = Math.random() * window.innerHeight;
+        this.createCircuitLine(x, y, width, height);
+      }, i * 100);
+    }
+    
+    // Return a promise that resolves when the animation is complete
+    return new Promise(resolve => {
+      setTimeout(() => {
+        this.container.classList.remove('active');
+        buttonElement.classList.remove('power-active');
+        this.isAnimating = false;
+        resolve();
+      }, 1500);
+    });
+  }
+}
+
+// Main document ready handler
 document.addEventListener('DOMContentLoaded', () => {
   const saveButton = document.getElementById('saveSettings');
   const apiKeyInput = document.getElementById('apiKey');
   const wooKeyInput = document.getElementById('wooKey');
   const wooSecretInput = document.getElementById('wooSecret');
+  
+  // Initialize AI Effect
+  const aiEffect = new AIEffect();
   
   // Load saved credentials
   chrome.storage.local.get(
@@ -56,31 +182,25 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Animate button
-    saveButton.style.transform = 'scale(0.95)';
-    setTimeout(() => {
-      saveButton.style.transform = 'scale(1)';
-    }, 100);
-
     try {
-      // First, save the credentials
+      // Trigger AI effect first
+      await aiEffect.activate(saveButton);
+
+      // Save the credentials
       await chrome.storage.local.set({
         anthropicApiKey: apiKey,
         wooCommerceKey: wooKey,
         wooCommerceSecret: wooSecret
       });
 
-      // Then test the WooCommerce connection and fetch products
+      // Test WooCommerce connection and fetch products
       try {
         showStatus('Testing connection...', 'status');
-
         const response = await testWooCommerceConnection(wooKey, wooSecret);
-        console.log('Connection test response:', response);
-
+        
         if (response.success) {
           await fetchAndStoreProducts(wooKey, wooSecret);
           showStatus('Settings saved and products updated!', 'success');
-          console.log('WooCommerce test successful:', response.data);
         } else {
           throw new Error(response.error || 'Connection failed');
         }
@@ -94,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
 
 async function testWooCommerceConnection(wooKey, wooSecret) {
   const baseUrl = 'https://www.icenter-iraq.com/wp-json/wc/v3/products';

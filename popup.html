@@ -124,7 +124,119 @@
       transform: translateY(-10px);
       transition: all 0.3s ease;
     }
-    
+    /* Add these AI effect styles to your existing CSS */
+.ai-effect-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.ai-effect-container.active {
+  opacity: 1;
+}
+
+.particle {
+  position: absolute;
+  background: linear-gradient(135deg, var(--arc-primary), #8A4FFF);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+}
+
+@keyframes particleAnimation {
+  0% {
+    transform: scale(0) translate(0, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translate(var(--tx), var(--ty));
+    opacity: 0;
+  }
+}
+
+.energy-ring {
+  position: absolute;
+  border: 2px solid var(--arc-primary);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes ringExpand {
+  0% {
+    transform: scale(0.1);
+    opacity: 1;
+    border-width: 10px;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+.power-wave {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--arc-primary), transparent);
+  opacity: 0;
+  transform-origin: left center;
+}
+
+@keyframes powerWave {
+  0% {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+
+.circuit-line {
+  position: absolute;
+  background: var(--arc-primary);
+  opacity: 0;
+}
+
+@keyframes circuitFlow {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+
+button.power-active {
+  box-shadow: 0 0 20px var(--arc-primary);
+  animation: buttonPulse 1s ease-in-out;
+}
+
+@keyframes buttonPulse {
+  0% {
+    box-shadow: 0 0 5px var(--arc-primary);
+  }
+  50% {
+    box-shadow: 0 0 30px var(--arc-primary);
+  }
+  100% {
+    box-shadow: 0 0 5px var(--arc-primary);
+  }
+}
     .success {
       background: rgba(52, 199, 89, 0.1);
       color: var(--arc-success);
@@ -175,7 +287,7 @@
 <body>
   <div class="container">
     <h2>AI Helper Settings</h2>
-    
+    <div class="ai-effect-container" id="aiEffectContainer"></div>
     <div class="section-title">Anthropic API</div>
     <div class="input-group">
       <label for="apiKey">API Key</label>
