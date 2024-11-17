@@ -91,6 +91,29 @@
   position: relative;  /* Add this to make absolute positioning work for children */
   overflow: hidden;    /* Add this to contain the progress bar */
 }
+.command-active {
+  background: var(--arc-surface) !important;
+  border: 1px solid var(--arc-primary);
+  color: var(--arc-primary);
+}
+
+.command-active .save-icon {
+  fill: var(--arc-primary);
+}
+
+.advanced-section {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
+}
+
+.advanced-section.visible {
+  max-height: 1000px;
+  opacity: 1;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
 
 button .progress-bar {
   position: absolute;
@@ -275,7 +298,32 @@ button .progress-percentage {
     transform: scaleX(1);
   }
 }
+.advanced-section {
+      display: none;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 0.3s ease;
+    }
 
+    .advanced-section.visible {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .button-content.advanced-mode {
+      background: linear-gradient(135deg, var(--arc-primary), #8A4FFF);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+   
+
+    /* Add subtle animation for section transitions */
+    .section-title {
+      transition: opacity 0.3s ease;
+    }
 button.power-active {
   box-shadow: 0 0 20px var(--arc-primary);
   animation: buttonPulse 1s ease-in-out;
@@ -291,6 +339,30 @@ button.power-active {
   100% {
     box-shadow: 0 0 5px var(--arc-primary);
   }
+}
+.text-area-input {
+  width: 100%;
+  padding: 12px;
+  background: var(--arc-surface);
+  border: 1px solid var(--arc-border);
+  border-radius: 8px;
+  color: var(--arc-text);
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+}
+
+.text-area-input:focus {
+  outline: none;
+  border-color: var(--arc-primary);
+  box-shadow: 0 0 0 2px rgba(255, 59, 113, 0.2);
+}
+
+.text-area-input::placeholder {
+  color: var(--arc-text-secondary);
 }
     .success {
       background: rgba(52, 199, 89, 0.1);
@@ -337,11 +409,89 @@ button.power-active {
     .shake {
       animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
     }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .header h2 {
+      margin: 0;
+    }
+
+    .advanced-toggle {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid var(--arc-border);
+      background: var(--arc-surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: var(--arc-text-secondary);
+    }
+
+    .advanced-toggle:hover {
+      background: var(--arc-border);
+      color: var(--arc-text);
+    }
+
+    .advanced-toggle.active {
+      background: var(--arc-primary);
+      border-color: var(--arc-primary);
+      color: white;
+    }
+
+    .advanced-toggle svg {
+      width: 18px;
+      height: 18px;
+      transition: transform 0.3s ease;
+    }
+
+    .advanced-toggle.active svg {
+      transform: rotate(180deg);
+    }
+
+    .advanced-section {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      margin: 0;
+      padding: 0;
+    }
+
+    .advanced-section.visible {
+      max-height: 800px;
+      opacity: 1;
+      margin: 20px 0;
+    }
+    .section-title {
+      transform: translateY(0);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .advanced-section:not(.visible) .section-title {
+      transform: translateY(-10px);
+    }
+
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>AI Helper Settings</h2>
+    <div class="header">
+      <h2>AI Helper Settings</h2>
+      <button class="advanced-toggle" id="advancedToggle" title="Advanced Settings">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+
     <div class="ai-effect-container" id="aiEffectContainer"></div>
     <div class="section-title">Anthropic API</div>
     <div class="input-group">
@@ -377,6 +527,31 @@ button.power-active {
         spellcheck="false"
       />
     </div>
+
+    <!-- Advanced sections - hidden by default -->
+    <div class="advanced-section" id="advancedSettings">
+      <div class="section-title">Offers</div>
+      <div class="input-group">
+        <label for="offers">Special Offers & Promotions</label>
+        <textarea 
+          id="offers" 
+          placeholder="Enter current offers and promotions"
+          rows="4"
+          class="text-area-input"
+        ></textarea>
+      </div>
+
+      <div class="section-title">Interaction Guidelines</div>
+      <div class="input-group">
+        <label for="guidelines">Customer Interaction Guidelines</label>
+        <textarea 
+          id="guidelines" 
+          placeholder="Enter customer interaction guidelines"
+          rows="6"
+          class="text-area-input"
+        ></textarea>
+      </div>
+    </div>
     
     <button id="saveSettings">
       <div class="progress-bar"></div>
@@ -386,7 +561,7 @@ button.power-active {
         <svg class="save-icon" viewBox="0 0 24 24">
           <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
         </svg>
-        Save Settings & Refresh
+        <span class="button-text">Save Settings & Refresh</span>
       </div>
     </button>
     

@@ -3,7 +3,7 @@ async function createAIHelper() {
   console.log('Facebook Message Extractor initialized');
 
     // Define processMessages function
-    async function processMessages(customerMessage, conversation_history) {
+    async function processMessages(customerMessage, conversation_history ,customerName ) {
         try {
             // Dynamically import the anthropicService module
             const { generateFullResponse, identifyProductInMessage } = await import(chrome.runtime.getURL('anthropicService.js'));
@@ -27,7 +27,8 @@ async function createAIHelper() {
             return await generateFullResponse(
                 customerMessage, 
                 conversation_history,
-                productDataString
+                productDataString,
+                customerName
             );
         } catch (error) {
             console.error('Error in processMessages:', error);
@@ -108,9 +109,94 @@ async function createAIHelper() {
       });
   }
 
-  function getConversationData() {
+  function extractCustomerName() {
+    try {
+        // Look for the header wrapper first
+        const headerWrapper = document.querySelector('[data-pagelet="BizInboxDetailViewHeaderSectionWrapper"]');
+        if (!headerWrapper) return 'Customer';
+
+        // Look for the profile section which typically contains the name
+        // We'll use multiple approaches to find the name element
+        
+        // Approach 1: Look for text near the profile image
+        const profileSection = headerWrapper.querySelector('img.img')?.closest('div.x78zum5');
+        if (profileSection) {
+            // Navigate to the adjacent text container
+            const nameContainer = profileSection.nextElementSibling?.querySelector('div[style*="-webkit-line-clamp: 1"]');
+            if (nameContainer?.textContent) {
+                return cleanName(nameContainer.textContent);
+            }
+        }
+
+        // Approach 2: Look for elements with specific styling that typically contains the name
+        const styledNameElement = headerWrapper.querySelector('div[style*="-webkit-line-clamp: 1"]');
+        if (styledNameElement?.textContent) {
+            return cleanName(styledNameElement.textContent);
+        }
+
+        // Approach 3: Look for elements near the "Assign this conversation" link
+        const assignLink = headerWrapper.querySelector('a[role="button"]');
+        if (assignLink) {
+            const nameElement = assignLink.closest('div.x78zum5')?.previousElementSibling;
+            if (nameElement?.textContent) {
+                return cleanName(nameElement.textContent);
+            }
+        }
+
+        // Default fallback
+        return 'Customer';
+    } catch (error) {
+        console.error('Error extracting customer name:', error);
+        return 'Customer';
+    }
+}
+
+function cleanName(name) {
+    if (!name) return 'Customer';
+    
+    // Remove common UI text elements
+    const uiTexts = [
+        'Assign this conversation',
+        'Open Dropdown',
+        'Menu',
+        'More',
+        'Available',
+        'Unavailable',
+        'Active',
+        'Inactive'
+    ];
+    
+    let cleanedName = name.trim();
+    
+    // Remove UI texts
+    uiTexts.forEach(text => {
+        cleanedName = cleanedName.replace(text, '').trim();
+    });
+    
+    // Basic validation
+    if (cleanedName.length < 2 || cleanedName.length > 50) {
+        return 'Customer';
+    }
+    
+    // Remove any extra whitespace
+    cleanedName = cleanedName.replace(/\s+/g, ' ').trim();
+    
+    // Final check for valid name (contains at least one letter)
+    if (!/[a-zA-Z]/.test(cleanedName)) {
+        return 'Customer';
+    }
+    
+    return cleanedName;
+}
+
+
+function getConversationData() {
     const messages = extractMessages();
-    console.log("extractMessages:",messages,"/extractMessages")
+    console.log("extractMessages:", messages, "/extractMessages");
+    
+    // Get customer name using our robust extractor
+    const customerName = extractCustomerName();
+    
     // Find index of our last response
     const lastBotIndex = messages.findIndex(msg => msg.isBot);
     
@@ -135,9 +221,11 @@ async function createAIHelper() {
 
     return {
         conversation_history,
-        customerMessage
+        customerMessage,
+        customerName
     };
 }
+
 
 function writeToChat(message) {
     try {
@@ -265,21 +353,28 @@ function createAIButton() {
 
   // Add the event listener
   button.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      const { conversation_history, customerMessage } = getConversationData();
-      
-      try {
-          writeToChat('Generating response...');
-          const response = await processMessages(customerMessage, JSON.stringify(conversation_history));
-          writeToChat(response);
-      } catch (error) {
-          console.error('Error processing message:', error);
-          writeToChat('Sorry, I encountered an error processing your message.');
-      }
-  });
-
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const { conversation_history, customerMessage, customerName } = getConversationData();
+    
+    console.log('Conversation History:', conversation_history);
+    console.log('Customer Message:', customerMessage);
+    console.log('Customer Name:', customerName);
+    
+    try {
+        writeToChat('Generating response...');
+        const response = await processMessages(
+            customerMessage, 
+            JSON.stringify(conversation_history),
+            customerName
+        );
+        writeToChat(response);
+    } catch (error) {
+        console.error('Error processing message:', error);
+        writeToChat('Sorry, I encountered an error processing your message.');
+    }
+});
   return button;
 }
 

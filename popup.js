@@ -1,5 +1,39 @@
 // popup.js
 // AIEffect class definition
+let isAdvancedMode = false;
+let isCommandPressed = false;
+// Add this at the top of popup.js
+const DEFAULT_GUIDELINES = `Guidelines for customer interaction:
+1. Always be polite, professional, and enthusiastic about Apple products and services.
+2. Address the customer by their name when appropriate.
+3. Provide accurate information based on the company info and product info.
+4. When discussing product availability, always use "غير متوفر حالياً" for unavailable items. Never reference warehouses or use the term "مخازننا".
+5. Look for opportunities to upsell or cross-sell products and services that may benefit the customer.
+6. Be mindful of the customer's previous interactions and purchases when making recommendations.
+
+When handling customer inquiries:
+1. Carefully read the customer's message to understand their needs or concerns.
+2. Provide relevant information from the company info or product info.
+3. If the customer has a history of purchases or inquiries, reference this information when appropriate to personalize the interaction.
+4. Answer questions concisely and accurately.
+5. Always look for opportunities to highlight the benefits of iCenter's products and services.
+
+Sales techniques and upselling guidelines:
+1. Identify the customer's needs based on their inquiry and history.
+2. Suggest complementary products or services that enhance their potential purchase.
+3. Highlight special offers, discounts, or promotions that may be relevant to the customer.
+4. Emphasize the unique benefits of purchasing from iCenter, such as authorized service and support.
+5. If a product is not available, suggest similar alternatives or offer to notify the customer when it becomes available.
+
+To respond to the customer, follow these steps:
+1. Greet the customer by name and thank them for their message.
+2. Address their specific inquiry or concern.
+3. Provide relevant information from the company info or product info.
+4. Look for opportunities to promote products or services.
+5. End with a polite closing and an invitation for further questions.
+6. Don't give any iPhone number in the respond but if really necessary.`;
+
+
 class AIEffect {
   constructor() {
     this.container = document.getElementById('aiEffectContainer');
@@ -123,17 +157,89 @@ class AIEffect {
 
 // Main document ready handler
 document.addEventListener('DOMContentLoaded', () => {
+  const advancedSection = document.getElementById('advancedSettings');
+  const advancedHint = document.getElementById('advancedHint');
+  const buttonContent = document.querySelector('#saveSettings .button-text');
+  const buttonIcon = document.querySelector('#saveSettings .save-icon');
+  const advancedToggle = document.getElementById('advancedToggle');
+  let isAdvancedMode = false;
   const saveButton = document.getElementById('saveSettings');
   const apiKeyInput = document.getElementById('apiKey');
   const wooKeyInput = document.getElementById('wooKey');
   const wooSecretInput = document.getElementById('wooSecret');
+  const offersInput = document.getElementById('offers');
+  const guidelinesInput = document.getElementById('guidelines');
   
+  advancedToggle.addEventListener('click', () => {
+    isAdvancedMode = !isAdvancedMode;
+    advancedToggle.classList.toggle('active');
+    advancedSection.classList.toggle('visible');
+    updateButtonText(hasData); // Your existing function
+  });
+
+  chrome.storage.local.get(['isAdvancedMode'], (result) => {
+    if (result.isAdvancedMode) {
+      isAdvancedMode = true;
+      advancedToggle.classList.add('active');
+      advancedSection.classList.add('visible');
+    }
+  });
+  
+  function saveAdvancedModePref() {
+    chrome.storage.local.set({ isAdvancedMode });
+  }
+
+
+
+
   // Initialize AI Effect
   const aiEffect = new AIEffect();
-  
+  setTimeout(() => {
+    advancedHint.classList.add('visible');
+    setTimeout(() => {
+      advancedHint.classList.remove('visible');
+    }, 3000);
+  }, 1000);
+    // Track command/ctrl key state
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Meta' || e.key === 'Control') {
+      isCommandPressed = true;
+      saveButton.classList.add('command-active');
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    if (e.key === 'Meta' || e.key === 'Control') {
+      isCommandPressed = false;
+      if (!isAdvancedMode) {
+        saveButton.classList.remove('command-active');
+      }
+    }
+  });
+
+  // Handle save button click with command key
+  saveButton.addEventListener('click', (e) => {
+    if (isCommandPressed) {
+      e.preventDefault();
+      isAdvancedMode = !isAdvancedMode;
+      advancedSection.classList.toggle('visible');
+      updateButtonText(!!result.productSlugs);
+      saveButton.classList.toggle('command-active');
+      return;
+    }
+  });
+  // Prevent advanced section from closing if user is actively editing
+  const advancedInputs = advancedSection.querySelectorAll('input, textarea');
+  advancedInputs.forEach(input => {
+    input.addEventListener('focus', () => {
+      isAdvancedMode = true;
+    });
+  });
+
+
   // Load saved credentials
   chrome.storage.local.get(
-    ['anthropicApiKey', 'wooCommerceKey', 'wooCommerceSecret', 'productSlugs'], // Added 'productSlugs'
+    ['anthropicApiKey', 'wooCommerceKey', 'wooCommerceSecret', 'productSlugs', 'offers', 'guidelines', 'isAdvancedMode'],
     (result) => {
       if (result.anthropicApiKey) {
         apiKeyInput.value = result.anthropicApiKey;
@@ -142,95 +248,118 @@ document.addEventListener('DOMContentLoaded', () => {
         wooKeyInput.value = result.wooCommerceKey;
       }
       if (result.wooCommerceSecret) {
-        wooSecretInput.value = result.wooCommerceSecret;
+        wooSecretInput.value = result.wooCommerceSecret; 
       }
+      if (result.offers) {
+        offersInput.value = result.offers;
+      }
+      if (result.guidelines) {
+        guidelinesInput.value = result.guidelines;
+      } else {
+        guidelinesInput.value = DEFAULT_GUIDELINES;
+      }
+      
+      // Restore advanced mode if it was active
+      if (result.isAdvancedMode) {
+        isAdvancedMode = true;
+        advancedToggle.classList.add('active');
+        advancedSection.classList.add('visible');
+      }
+      
       updateButtonText(!!result.productSlugs);
     }
   );
 
-  // Save credentials and refresh products
-  saveButton.addEventListener('click', async () => {
-    const apiKey = apiKeyInput.value.trim();
-    const wooKey = wooKeyInput.value.trim();
-    const wooSecret = wooSecretInput.value.trim();
-    
-    // Validate Anthropic API Key
-    if (!apiKey) {
-      showStatus('Please enter an Anthropic API key', 'error');
-      shakeInput(apiKeyInput);
-      return;
-    }
-    
-    if (!apiKey.startsWith('sk-ant-')) {
-      showStatus('Invalid Anthropic API key format', 'error');
-      shakeInput(apiKeyInput);
-      return;
-    }
+// Save credentials and refresh products
+saveButton.addEventListener('click', async () => {
+  const apiKey = apiKeyInput.value.trim();
+  const wooKey = wooKeyInput.value.trim();
+  const wooSecret = wooSecretInput.value.trim();
+  const offers = offersInput.value.trim();
+  const guidelines = guidelinesInput.value.trim() || DEFAULT_GUIDELINES;
 
-    // Validate WooCommerce credentials
-    if (!wooKey || !wooSecret) {
-      showStatus('Please enter WooCommerce credentials', 'error');
-      if (!wooKey) shakeInput(wooKeyInput);
-      if (!wooSecret) shakeInput(wooSecretInput);
-      return;
-    }
+  // Validate Anthropic API Key
+  if (!apiKey) {
+    showStatus('Please enter an Anthropic API key', 'error');
+    shakeInput(apiKeyInput);
+    return;
+  }
+  
+  if (!apiKey.startsWith('sk-ant-')) {
+    showStatus('Invalid Anthropic API key format', 'error');
+    shakeInput(apiKeyInput);
+    return;
+  }
 
-    // Basic length validation for WooCommerce credentials
-    if (wooKey.length < 10 || wooSecret.length < 10) {
-      showStatus('Invalid WooCommerce credentials format', 'error');
-      shakeInput(wooKeyInput);
-      shakeInput(wooSecretInput);
-      return;
-    }
+  // Validate WooCommerce credentials
+  if (!wooKey || !wooSecret) {
+    showStatus('Please enter WooCommerce credentials', 'error');
+    if (!wooKey) shakeInput(wooKeyInput);
+    if (!wooSecret) shakeInput(wooSecretInput);
+    return;
+  }
+
+  // Basic length validation for WooCommerce credentials
+  if (wooKey.length < 10 || wooSecret.length < 10) {
+    showStatus('Invalid WooCommerce credentials format', 'error');
+    shakeInput(wooKeyInput);
+    shakeInput(wooSecretInput);
+    return;
+  }
+
+  try {
+    // Trigger AI effect first
+    saveButton.classList.add('processing');
+    updateProgress(10, 'Starting...');
+
+    await aiEffect.activate(saveButton);
+    
+    updateProgress(20, 'Saving credentials...');
+
+    // Save the credentials
+    await chrome.storage.local.set({
+      anthropicApiKey: apiKey,
+      wooCommerceKey: wooKey,
+      wooCommerceSecret: wooSecret,
+      offers: offers,
+      guidelines: guidelines
+    });
+    updateProgress(40, 'Testing connection...');
 
     try {
-      // Trigger AI effect first
-      saveButton.classList.add('processing');
-      updateProgress(10, 'Starting...');
-
-      await aiEffect.activate(saveButton);
+      const response = await testWooCommerceConnection(wooKey, wooSecret);
       
-      updateProgress(20, 'Saving credentials...');
-
-      // Save the credentials
-      await chrome.storage.local.set({
-        anthropicApiKey: apiKey,
-        wooCommerceKey: wooKey,
-        wooCommerceSecret: wooSecret
-      });
-      updateProgress(40, 'Testing connection...');
-  
-      try {
-        const response = await testWooCommerceConnection(wooKey, wooSecret);
+      if (response.success) {
+        // Pass the updateProgress function to fetchAndStoreProducts
+        await fetchAndStoreProducts(wooKey, wooSecret, updateProgress);
         
-        if (response.success) {
-          // Pass the updateProgress function to fetchAndStoreProducts
-          await fetchAndStoreProducts(wooKey, wooSecret, updateProgress);
-          
-          // Short delay to show the completed progress bar
-          await new Promise(resolve => setTimeout(resolve, 200));
-          
-          showStatus('Settings saved and products updated!', 'success');
+        // Short delay to show the completed progress bar
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Show appropriate success message based on mode
+        if (isAdvancedMode) {
+          showStatus('Advanced settings saved successfully!', 'success');
         } else {
-          throw new Error(response.error || 'Connection failed');
+          showStatus('Settings saved and products updated!', 'success');
         }
-      } catch (error) {
-        console.error('Connection test error:', error);
-        showStatus(`Connection Error: ${error.message}`, 'error');
+      } else {
+        throw new Error(response.error || 'Connection failed');
       }
     } catch (error) {
-      console.error('Settings save error:', error);
-      showStatus('Error saving settings', 'error');
-    } finally {
-      // Reset button state after a short delay
-      setTimeout(() => {
-        saveButton.classList.remove('processing');
-        updateProgress(0, '');
-      }, 500);
+      console.error('Connection test error:', error);
+      showStatus(`Connection Error: ${error.message}`, 'error');
     }
-  });
-  
-
+  } catch (error) {
+    console.error('Settings save error:', error);
+    showStatus('Error saving settings', 'error');
+  } finally {
+    // Reset button state after a short delay
+    setTimeout(() => {
+      saveButton.classList.remove('processing');
+      updateProgress(0, '');
+    }, 500);
+  }
+});
 
 async function testWooCommerceConnection(wooKey, wooSecret) {
   const baseUrl = 'https://www.icenter-iraq.com/wp-json/wc/v3/products';
@@ -435,21 +564,21 @@ function updateProgress(percent, status = '') {
 }
 
 function updateButtonText(hasData) {
-  const buttonContent = document.querySelector('#saveSettings .button-content');
-  if (buttonContent) {
-    buttonContent.innerHTML = `
-      <svg class="save-icon" viewBox="0 0 24 24">
-        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-      </svg>
-      ${hasData ? 'Sync' : 'Start AI Assistant'}
-    `;
+  const buttonText = document.querySelector('#saveSettings .button-text');
+  if (buttonText) {
+    if (isAdvancedMode) {
+      buttonText.textContent = 'Save Advanced Settings';
+    } else {
+      buttonText.textContent = hasData ? 'Sync' : 'Start AI Assistant';
+    }
   }
 }
+});
+
+
 function shakeInput(element) {
   element.classList.add('shake');
   element.addEventListener('animationend', () => {
     element.classList.remove('shake');
   }, { once: true });
 }
-}
-)
