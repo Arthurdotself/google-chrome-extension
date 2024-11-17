@@ -87,7 +87,36 @@
     input::placeholder {
       color: var(--arc-text-secondary);
     }
-    
+    button {
+  position: relative;  /* Add this to make absolute positioning work for children */
+  overflow: hidden;    /* Add this to contain the progress bar */
+}
+
+button .progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0%;
+  background: var(--arc-primary);
+  transition: width 0.3s ease;
+  z-index: 1;
+}
+
+button.processing {
+  background: var(--arc-surface);
+  cursor: not-allowed;
+}
+
+button.processing .progress-bar {
+  background: var(--arc-primary);
+}
+
+/* Modify the existing button:hover style */
+button:not(.processing):hover {
+  background: var(--arc-primary-hover);
+  transform: translateY(-1px);
+}
     button {
       width: 100%;
       padding: 12px;
@@ -179,6 +208,32 @@
     opacity: 0;
     border-width: 1px;
   }
+}
+button .progress-status {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: var(--arc-text);
+  font-size: 12px;
+  z-index: 2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 12px;
+}
+
+button.processing .button-content {
+  opacity: 0;
+}
+
+button .progress-percentage {
+  position: absolute;
+  right: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 2;
+  color: var(--arc-text);
 }
 
 .power-wave {
@@ -324,10 +379,15 @@ button.power-active {
     </div>
     
     <button id="saveSettings">
-      <svg class="save-icon" viewBox="0 0 24 24">
-        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-      </svg>
-      Save Settings & Refresh
+      <div class="progress-bar"></div>
+      <div class="progress-status"></div>
+      <div class="progress-percentage"></div>
+      <div class="button-content">
+        <svg class="save-icon" viewBox="0 0 24 24">
+          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+        </svg>
+        Save Settings & Refresh
+      </div>
     </button>
     
     <div id="status" class="status"></div>

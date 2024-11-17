@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Load saved credentials
   chrome.storage.local.get(
-    ['anthropicApiKey', 'wooCommerceKey', 'wooCommerceSecret'], 
+    ['anthropicApiKey', 'wooCommerceKey', 'wooCommerceSecret', 'productSlugs'], // Added 'productSlugs'
     (result) => {
       if (result.anthropicApiKey) {
         apiKeyInput.value = result.anthropicApiKey;
@@ -144,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (result.wooCommerceSecret) {
         wooSecretInput.value = result.wooCommerceSecret;
       }
+      updateButtonText(!!result.productSlugs);
     }
   );
 
@@ -184,7 +185,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       // Trigger AI effect first
+      saveButton.classList.add('processing');
+      updateProgress(10, 'Starting...');
+
       await aiEffect.activate(saveButton);
+      
+      updateProgress(20, 'Saving credentials...');
 
       // Save the credentials
       await chrome.storage.local.set({
@@ -192,14 +198,18 @@ document.addEventListener('DOMContentLoaded', () => {
         wooCommerceKey: wooKey,
         wooCommerceSecret: wooSecret
       });
-
-      // Test WooCommerce connection and fetch products
+      updateProgress(40, 'Testing connection...');
+  
       try {
-        showStatus('Testing connection...', 'status');
         const response = await testWooCommerceConnection(wooKey, wooSecret);
         
         if (response.success) {
-          await fetchAndStoreProducts(wooKey, wooSecret);
+          // Pass the updateProgress function to fetchAndStoreProducts
+          await fetchAndStoreProducts(wooKey, wooSecret, updateProgress);
+          
+          // Short delay to show the completed progress bar
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
           showStatus('Settings saved and products updated!', 'success');
         } else {
           throw new Error(response.error || 'Connection failed');
@@ -211,9 +221,15 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       console.error('Settings save error:', error);
       showStatus('Error saving settings', 'error');
+    } finally {
+      // Reset button state after a short delay
+      setTimeout(() => {
+        saveButton.classList.remove('processing');
+        updateProgress(0, '');
+      }, 500);
     }
   });
-});
+  
 
 
 async function testWooCommerceConnection(wooKey, wooSecret) {
@@ -244,19 +260,30 @@ async function testWooCommerceConnection(wooKey, wooSecret) {
 }
 
 
-async function fetchAndStoreProducts(wooKey, wooSecret) {
+async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
   const baseUrl = 'https://www.icenter-iraq.com/wp-json/wc/v3/products';
   const categoryIds = [21, 22, 23, 24];
   let allProducts = [];
-
+  
+  updateProgress(60, 'Fetching products...');
+  
+  // Calculate progress steps for categories
+  const progressPerCategory = 10; // 10% progress per category (40% total)
+  
   // First fetch all products from categories
-  for (const categoryId of categoryIds) {
+  for (let i = 0; i < categoryIds.length; i++) {
+    const categoryId = categoryIds[i];
     try {
       const url = new URL(baseUrl);
       url.searchParams.append('consumer_key', wooKey);
       url.searchParams.append('consumer_secret', wooSecret);
       url.searchParams.append('category', categoryId);
       url.searchParams.append('per_page', '100');
+      
+      updateProgress(
+        60 + (progressPerCategory * i), 
+        `Fetching category ${i + 1}/${categoryIds.length}...`
+      );
       
       const response = await fetch(url.toString());
       
@@ -266,6 +293,13 @@ async function fetchAndStoreProducts(wooKey, wooSecret) {
 
       const products = await response.json();
       allProducts = [...allProducts, ...products];
+      
+      // Update progress after each category
+      updateProgress(
+        60 + (progressPerCategory * (i + 1)), 
+        `Fetched category ${i + 1}/${categoryIds.length}`
+      );
+      
     } catch (error) {
       console.error(`Error fetching category ${categoryId}:`, error);
       throw error;
@@ -273,6 +307,7 @@ async function fetchAndStoreProducts(wooKey, wooSecret) {
   }
 
   // Remove duplicates based on slug
+  updateProgress(85, 'Processing products...');
   allProducts = Array.from(new Set(allProducts.map(p => p.slug)))
     .map(slug => allProducts.find(p => p.slug === slug));
 
@@ -283,24 +318,38 @@ async function fetchAndStoreProducts(wooKey, wooSecret) {
 
   // Then fetch variations for variable products
   const variations = [];
-  for (const product of allProducts) {
-    if (product.type === 'variable') {
-      try {
-        const productVariations = await fetchProductVariations(wooKey, wooSecret, product.id);
-        if (productVariations.length > 0) {
-          variations.push({
-            slug: product.slug,
-            variations: productVariations
-          });
-        }
-      } catch (error) {
-        console.error(`Error fetching variations for product ${product.slug}:`, error);
+  const variableProducts = allProducts.filter(p => p.type === 'variable');
+  
+  // Calculate progress steps for variations
+  const totalVariableProducts = variableProducts.length;
+  const progressPerVariation = totalVariableProducts > 0 ? 10 / totalVariableProducts : 0;
+  
+  updateProgress(90, 'Fetching product variations...');
+  
+  for (let i = 0; i < variableProducts.length; i++) {
+    const product = variableProducts[i];
+    try {
+      updateProgress(
+        90 + (progressPerVariation * i),
+        `Fetching variations ${i + 1}/${totalVariableProducts}...`
+      );
+      
+      const productVariations = await fetchProductVariations(wooKey, wooSecret, product.id);
+      if (productVariations.length > 0) {
+        variations.push({
+          slug: product.slug,
+          variations: productVariations
+        });
       }
+    } catch (error) {
+      console.error(`Error fetching variations for product ${product.slug}:`, error);
     }
   }
 
   // Store the variations
+  updateProgress(98, 'Saving data...');
   await chrome.storage.local.set({ productVariations: variations });
+  
   console.log('Stored productVariations structure:', JSON.stringify(variations, null, 2));
   console.log('Number of products with variations:', variations.length);
   variations.forEach(product => {
@@ -309,7 +358,8 @@ async function fetchAndStoreProducts(wooKey, wooSecret) {
       variationExample: product.variations[0]
     });
   });
-    
+  
+  updateProgress(100, 'Complete!');
   return { slugs: allSlugs, variations };
 }
 
@@ -362,10 +412,44 @@ function showStatus(message, type) {
     }, 3000);
   }
 }
+//ui
+function updateProgress(percent, status = '') {
+  const button = document.getElementById('saveSettings');
+  const progressBar = button.querySelector('.progress-bar');
+  const progressStatus = button.querySelector('.progress-status');
+  const progressPercentage = button.querySelector('.progress-percentage');
+  
+  if (progressBar) {
+    progressBar.style.width = `${percent}%`;
+  }
+  
+  if (progressStatus) {
+    // Clear text if percent is 0
+    progressStatus.textContent = percent === 0 ? '' : status;
+  }
+  
+  if (progressPercentage) {
+    // Clear percentage if percent is 0
+    progressPercentage.textContent = percent === 0 ? '' : `${Math.round(percent)}%`;
+  }
+}
 
+function updateButtonText(hasData) {
+  const buttonContent = document.querySelector('#saveSettings .button-content');
+  if (buttonContent) {
+    buttonContent.innerHTML = `
+      <svg class="save-icon" viewBox="0 0 24 24">
+        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+      </svg>
+      ${hasData ? 'Sync' : 'Start AI Assistant'}
+    `;
+  }
+}
 function shakeInput(element) {
   element.classList.add('shake');
   element.addEventListener('animationend', () => {
     element.classList.remove('shake');
   }, { once: true });
 }
+}
+)
