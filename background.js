@@ -21,7 +21,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function makeAnthropicRequest(messages, apiKey) {
+async function makeAnthropicRequest(messages, apiKey, modelConfig = {}) {
+  const defaultConfig = {
+    model: "claude-3-5-haiku-20241022",
+    max_tokens: 1000,
+    temperature: 0.3
+  };
+
+  const config = { ...defaultConfig, ...modelConfig };
+
   try {
     const response = await fetch(ANTHROPIC_API_URL, {
       method: 'POST',
@@ -32,9 +40,9 @@ async function makeAnthropicRequest(messages, apiKey) {
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: "claude-3-haiku-20240307",
-        max_tokens: 1000,
-        temperature: 0.3,
+        model: config.model,
+        max_tokens: config.max_tokens,
+        temperature: config.temperature,
         messages: messages
       })
     });

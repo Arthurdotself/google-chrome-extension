@@ -191,33 +191,19 @@ function cleanName(name) {
 
 
 function getConversationData() {
-    const messages = extractMessages();
-    console.log("extractMessages:", messages, "/extractMessages");
+    const messages = extractMessages()
+        .filter(msg => !msg.isBot); // Filter out bot messages
     
     // Get customer name using our robust extractor
     const customerName = extractCustomerName();
     
-    // Find index of our last response
-    const lastBotIndex = messages.findIndex(msg => msg.isBot);
-    
-    // Get all messages after our last response as customerMessage
-    const unansweredMessages = lastBotIndex >= 0 
-        ? messages.slice(lastBotIndex + 1).filter(msg => !msg.isBot)
-        : messages.filter(msg => !msg.isBot);
-    
-    // Combine all unanswered messages into customerMessage
-    const customerMessage = unansweredMessages
+    // Get all messages as customerMessage since we've already filtered out bot messages
+    const customerMessage = messages
         .map(msg => msg.text)
         .join('\n');
     
-    // Get all messages before the unanswered ones as conversation_history
-    const historyMessages = lastBotIndex >= 0 
-        ? messages.slice(0, lastBotIndex + 1)
-        : [];
-    
-    const conversation_history = historyMessages
-        .map(msg => msg.text)
-        .join('\n');
+    // Since we're not including bot messages, conversation_history will be empty
+    const conversation_history = '';
 
     return {
         conversation_history,

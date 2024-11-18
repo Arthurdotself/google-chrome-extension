@@ -66,6 +66,56 @@
       font-weight: 500;
     }
     
+.select-input {
+  width: 100%;
+  padding: 12px;
+  background: var(--arc-surface);
+  border: 1px solid var(--arc-border);
+  border-radius: 8px;
+  color: var(--arc-text);
+  font-size: 14px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.select-input:focus {
+  outline: none;
+  border-color: var(--arc-primary);
+  box-shadow: 0 0 0 2px rgba(255, 59, 113, 0.2);
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-input {
+  flex: 1;
+  height: 4px;
+  background: var(--arc-surface);
+  border-radius: 2px;
+  -webkit-appearance: none;
+}
+
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--arc-primary);
+  cursor: pointer;
+  border: none;
+}
+
+.slider-value {
+  min-width: 36px;
+  padding: 4px 8px;
+  background: var(--arc-surface);
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+}
     input {
       width: 100%;
       padding: 12px;
@@ -552,7 +602,29 @@ button.power-active {
         ></textarea>
       </div>
     </div>
-    
+    <div class="section-title">Model Configuration</div>
+<div class="input-group">
+  <label for="modelSelect">AI Model</label>
+  <select id="modelSelect" class="select-input">
+    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+  </select>
+</div>
+<div class="input-group">
+  <label for="temperatureSlider">Temperature (Creativity)</label>
+  <div class="slider-container">
+    <input 
+      type="range" 
+      id="temperatureSlider" 
+      min="0" 
+      max="1" 
+      step="0.1" 
+      value="0.7"
+      class="slider-input"
+    />
+    <span id="temperatureValue" class="slider-value">0.7</span>
+  </div>
+</div>
     <button id="saveSettings">
       <div class="progress-bar"></div>
       <div class="progress-status"></div>

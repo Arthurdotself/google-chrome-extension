@@ -7,9 +7,8 @@ const DEFAULT_GUIDELINES = `Guidelines for customer interaction:
 1. Always be polite, professional, and enthusiastic about Apple products and services.
 2. Address the customer by their name when appropriate.
 3. Provide accurate information based on the company info and product info.
-4. When discussing product availability, always use "غير متوفر حالياً" for unavailable items. Never reference warehouses or use the term "مخازننا".
-5. Look for opportunities to upsell or cross-sell products and services that may benefit the customer.
-6. Be mindful of the customer's previous interactions and purchases when making recommendations.
+4. Look for opportunities to upsell or cross-sell products and services that may benefit the customer.
+5. Be mindful of the customer's previous interactions and purchases when making recommendations.
 
 When handling customer inquiries:
 1. Carefully read the customer's message to understand their needs or concerns.
@@ -23,7 +22,7 @@ Sales techniques and upselling guidelines:
 2. Suggest complementary products or services that enhance their potential purchase.
 3. Highlight special offers, discounts, or promotions that may be relevant to the customer.
 4. Emphasize the unique benefits of purchasing from iCenter, such as authorized service and support.
-5. If a product is not available, suggest similar alternatives or offer to notify the customer when it becomes available.
+5. If a product is not available , suggest similar alternatives or offer to notify the customer when it becomes available.
 
 To respond to the customer, follow these steps:
 1. Greet the customer by name and thank them for their message.
@@ -31,7 +30,10 @@ To respond to the customer, follow these steps:
 3. Provide relevant information from the company info or product info.
 4. Look for opportunities to promote products or services.
 5. End with a polite closing and an invitation for further questions.
-6. Don't give any iPhone number in the respond but if really necessary.`;
+6. your respond MUST be high level of writing.
+7. In the end of the message, don't ask to contact us.
+** MUST NEVER give our contact numbers in the respond,(You can give it only when the customer asks for)**
+RESPOND MUST HAVE NO MISTAKE or MISSPELLING`;
 
 
 class AIEffect {
@@ -158,9 +160,7 @@ class AIEffect {
 // Main document ready handler
 document.addEventListener('DOMContentLoaded', () => {
   const advancedSection = document.getElementById('advancedSettings');
-  const advancedHint = document.getElementById('advancedHint');
-  const buttonContent = document.querySelector('#saveSettings .button-text');
-  const buttonIcon = document.querySelector('#saveSettings .save-icon');
+  //const advancedHint = document.getElementById('advancedHint');
   const advancedToggle = document.getElementById('advancedToggle');
   let isAdvancedMode = false;
   const saveButton = document.getElementById('saveSettings');
@@ -169,7 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const wooSecretInput = document.getElementById('wooSecret');
   const offersInput = document.getElementById('offers');
   const guidelinesInput = document.getElementById('guidelines');
-  
+  const modelSelect = document.getElementById('modelSelect');
+  const temperatureSlider = document.getElementById('temperatureSlider');
+  const temperatureValue = document.getElementById('temperatureValue');
+
   advancedToggle.addEventListener('click', () => {
     isAdvancedMode = !isAdvancedMode;
     advancedToggle.classList.toggle('active');
@@ -177,27 +180,18 @@ document.addEventListener('DOMContentLoaded', () => {
     updateButtonText(hasData); // Your existing function
   });
 
-  chrome.storage.local.get(['isAdvancedMode'], (result) => {
-    if (result.isAdvancedMode) {
-      isAdvancedMode = true;
-      advancedToggle.classList.add('active');
-      advancedSection.classList.add('visible');
-    }
-  });
-  
-  function saveAdvancedModePref() {
-    chrome.storage.local.set({ isAdvancedMode });
-  }
-
-
+// Update temperature display
+temperatureSlider.addEventListener('input', () => {
+  temperatureValue.textContent = temperatureSlider.value;
+});
 
 
   // Initialize AI Effect
   const aiEffect = new AIEffect();
   setTimeout(() => {
-    advancedHint.classList.add('visible');
+    //advancedHint.classList.add('visible');
     setTimeout(() => {
-      advancedHint.classList.remove('visible');
+    //  advancedHint.classList.remove('visible');
     }, 3000);
   }, 1000);
     // Track command/ctrl key state
@@ -218,17 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Handle save button click with command key
-  saveButton.addEventListener('click', (e) => {
-    if (isCommandPressed) {
-      e.preventDefault();
-      isAdvancedMode = !isAdvancedMode;
-      advancedSection.classList.toggle('visible');
-      updateButtonText(!!result.productSlugs);
-      saveButton.classList.toggle('command-active');
-      return;
-    }
-  });
-  // Prevent advanced section from closing if user is actively editing
+    // Prevent advanced section from closing if user is actively editing
   const advancedInputs = advancedSection.querySelectorAll('input, textarea');
   advancedInputs.forEach(input => {
     input.addEventListener('focus', () => {
@@ -237,38 +221,47 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 
-  // Load saved credentials
-  chrome.storage.local.get(
-    ['anthropicApiKey', 'wooCommerceKey', 'wooCommerceSecret', 'productSlugs', 'offers', 'guidelines', 'isAdvancedMode'],
-    (result) => {
-      if (result.anthropicApiKey) {
-        apiKeyInput.value = result.anthropicApiKey;
-      }
-      if (result.wooCommerceKey) {
-        wooKeyInput.value = result.wooCommerceKey;
-      }
-      if (result.wooCommerceSecret) {
-        wooSecretInput.value = result.wooCommerceSecret; 
-      }
-      if (result.offers) {
-        offersInput.value = result.offers;
-      }
-      if (result.guidelines) {
-        guidelinesInput.value = result.guidelines;
-      } else {
-        guidelinesInput.value = DEFAULT_GUIDELINES;
-      }
-      
-      // Restore advanced mode if it was active
-      if (result.isAdvancedMode) {
-        isAdvancedMode = true;
-        advancedToggle.classList.add('active');
-        advancedSection.classList.add('visible');
-      }
-      
-      updateButtonText(!!result.productSlugs);
+// Load saved credentials
+chrome.storage.local.get(
+  ['anthropicApiKey', 'wooCommerceKey', 'wooCommerceSecret', 'productSlugs', 'offers', 'guidelines', 'isAdvancedMode', 'modelName', 'temperature'],
+  (result) => {
+    if (result.anthropicApiKey) {
+      apiKeyInput.value = result.anthropicApiKey;
     }
-  );
+    if (result.wooCommerceKey) {
+      wooKeyInput.value = result.wooCommerceKey;
+    }
+    if (result.wooCommerceSecret) {
+      wooSecretInput.value = result.wooCommerceSecret; 
+    }
+    if (result.offers) {
+      offersInput.value = result.offers;
+    }
+    if (result.guidelines) {
+      guidelinesInput.value = result.guidelines;
+    } else {
+      guidelinesInput.value = DEFAULT_GUIDELINES;
+    }
+    if (result.modelName) {
+      modelSelect.value = result.modelName;
+    }
+    if (result.temperature) {
+      temperatureSlider.value = result.temperature;
+      temperatureValue.textContent = result.temperature;
+    }
+    
+    // Restore advanced mode if it was active
+    if (result.isAdvancedMode) {
+      isAdvancedMode = true;
+      advancedToggle.classList.add('active');
+      advancedSection.classList.add('visible');
+    }
+    
+    updateButtonText(!!result.productSlugs);
+  }
+);
+  
+  
 
 // Save credentials and refresh products
 saveButton.addEventListener('click', async () => {
@@ -277,6 +270,8 @@ saveButton.addEventListener('click', async () => {
   const wooSecret = wooSecretInput.value.trim();
   const offers = offersInput.value.trim();
   const guidelines = guidelinesInput.value.trim() || DEFAULT_GUIDELINES;
+  const modelName = modelSelect.value;
+  const temperature = parseFloat(temperatureSlider.value);
 
   // Validate Anthropic API Key
   if (!apiKey) {
@@ -322,7 +317,9 @@ saveButton.addEventListener('click', async () => {
       wooCommerceKey: wooKey,
       wooCommerceSecret: wooSecret,
       offers: offers,
-      guidelines: guidelines
+      guidelines: guidelines,
+      modelName: modelName,
+      temperature: temperature
     });
     updateProgress(40, 'Testing connection...');
 
@@ -353,6 +350,7 @@ saveButton.addEventListener('click', async () => {
     console.error('Settings save error:', error);
     showStatus('Error saving settings', 'error');
   } finally {
+    
     // Reset button state after a short delay
     setTimeout(() => {
       saveButton.classList.remove('processing');
@@ -573,7 +571,7 @@ function updateButtonText(hasData) {
     }
   }
 }
-});
+
 
 
 function shakeInput(element) {
@@ -582,3 +580,4 @@ function shakeInput(element) {
     element.classList.remove('shake');
   }, { once: true });
 }
+})
