@@ -3,7 +3,7 @@ const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'makeAnthropicRequest') {
-    // Get API key from storage
+    // Get API key from Storage
     chrome.storage.local.get(['anthropicApiKey'], (result) => {
       if (!result.anthropicApiKey) {
         sendResponse({ 
