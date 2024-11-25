@@ -36,6 +36,45 @@ To respond to the customer, follow these steps:
 RESPOND MUST HAVE NO MISTAKE or MISSPELLING`;
 
 
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Function to save specific settings
+async function saveSettings(key, value) {
+  try {
+    await chrome.storage.local.set({ [key]: value });
+    console.log(`Auto-saved ${key}`);
+    
+    // Show a subtle success indication
+    const statusElement = document.getElementById('status');
+    statusElement.textContent = 'Changes saved automatically';
+    statusElement.className = 'status success';
+    statusElement.style.opacity = '0.7';
+    statusElement.style.transform = 'translateY(0)';
+    
+    setTimeout(() => {
+      statusElement.style.opacity = '0';
+      statusElement.style.transform = 'translateY(-10px)';
+    }, 1500);
+  } catch (error) {
+    console.error('Error auto-saving settings:', error);
+  }
+}
+
+// Debounced save function
+const debouncedSave = debounce(saveSettings, 500);
+
+
+
 class AIEffect {
   constructor() {
     this.container = document.getElementById('aiEffectContainer');
@@ -188,6 +227,24 @@ temperatureSlider.addEventListener('input', () => {
 
   // Initialize AI Effect
   const aiEffect = new AIEffect();
+  modelSelect.addEventListener('change', () => {
+    debouncedSave('modelName', modelSelect.value);
+  });
+
+  temperatureSlider.addEventListener('input', () => {
+    temperatureValue.textContent = temperatureSlider.value;
+    debouncedSave('temperature', parseFloat(temperatureSlider.value));
+  });
+
+  offersInput.addEventListener('input', () => {
+    debouncedSave('offers', offersInput.value.trim());
+  });
+
+  guidelinesInput.addEventListener('input', () => {
+    const value = guidelinesInput.value.trim() || DEFAULT_GUIDELINES;
+    debouncedSave('guidelines', value);
+  });
+
   setTimeout(() => {
     //advancedHint.classList.add('visible');
     setTimeout(() => {
@@ -389,15 +446,15 @@ async function testWooCommerceConnection(wooKey, wooSecret) {
 
 async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
   const baseUrl = 'https://www.icenter-iraq.com/wp-json/wc/v3/products';
-  const categoryIds = [21, 22, 23, 24];
-  let allProducts = [];
+  const categoryIds = [ 20, 21, 22, 23, 24];
+  const productMap = new Map();
   
   updateProgress(60, 'Fetching products...');
   
   // Calculate progress steps for categories
   const progressPerCategory = 10; // 10% progress per category (40% total)
   
-  // First fetch all products from categories
+  // Fetch all products from categories and store them in a Map to avoid duplicates
   for (let i = 0; i < categoryIds.length; i++) {
     const categoryId = categoryIds[i];
     try {
@@ -419,7 +476,13 @@ async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
       }
 
       const products = await response.json();
-      allProducts = [...allProducts, ...products];
+
+      // Add products to the Map using their ID to prevent duplicates
+      products.forEach(product => {
+        if (!productMap.has(product.id)) {
+          productMap.set(product.id, product);
+        }
+      });
       
       // Update progress after each category
       updateProgress(
@@ -433,19 +496,32 @@ async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
     }
   }
 
-  // Remove duplicates based on slug
-  updateProgress(85, 'Processing products...');
-  allProducts = Array.from(new Set(allProducts.map(p => p.slug)))
-    .map(slug => allProducts.find(p => p.slug === slug));
+  // Convert the Map to an array of products
+  const allProducts = Array.from(productMap.values());
 
-  // Store slugs first
-  const allSlugs = allProducts.map(product => product.slug);
+  // Exclude products with catalog_visibility set to 'hidden'
+  const visibleProducts = allProducts.filter(product => product.catalog_visibility !== 'hidden');
+
+  // Store slugs of visible products
+  const allSlugs = visibleProducts.map(product => product.slug);
   await chrome.storage.local.set({ productSlugs: allSlugs });
   console.log('Stored product slugs:', allSlugs);
 
-  // Then fetch variations for variable products
+  // Initialize arrays for variations and out-of-production products
   const variations = [];
-  const variableProducts = allProducts.filter(p => p.type === 'variable');
+  const outOfProductionProducts = [];
+
+  // Handle products that are hidden (out of production)
+  const hiddenProducts = allProducts.filter(product => product.catalog_visibility === 'hidden');
+  hiddenProducts.forEach(product => {
+    outOfProductionProducts.push({
+      slug: product.slug,
+      status: 'out of production'
+    });
+  });
+
+  // Fetch variations for variable products that are visible
+  const variableProducts = visibleProducts.filter(p => p.type === 'variable');
   
   // Calculate progress steps for variations
   const totalVariableProducts = variableProducts.length;
@@ -455,6 +531,7 @@ async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
   
   for (let i = 0; i < variableProducts.length; i++) {
     const product = variableProducts[i];
+
     try {
       updateProgress(
         90 + (progressPerVariation * i),
@@ -473,9 +550,12 @@ async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
     }
   }
 
-  // Store the variations
+  // Store the variations and out-of-production products
   updateProgress(98, 'Saving data...');
-  await chrome.storage.local.set({ productVariations: variations });
+  await chrome.storage.local.set({ 
+    productVariations: variations,
+    outOfProductionProducts: outOfProductionProducts
+  });
   
   console.log('Stored productVariations structure:', JSON.stringify(variations, null, 2));
   console.log('Number of products with variations:', variations.length);
@@ -486,8 +566,10 @@ async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
     });
   });
   
+  console.log('Out of production products:', JSON.stringify(outOfProductionProducts, null, 2));
+  
   updateProgress(100, 'Complete!');
-  return { slugs: allSlugs, variations };
+  return { slugs: allSlugs, variations, outOfProductionProducts };
 }
 
 async function fetchProductVariations(wooKey, wooSecret, productId) {
@@ -519,6 +601,7 @@ async function fetchProductVariations(wooKey, wooSecret, productId) {
     return [];
   }
 }
+
 
 
 function showStatus(message, type) {
