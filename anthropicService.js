@@ -31,8 +31,8 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
             temperature: 0.3
         };
 
-        const storage2 = await chrome.storage.local.get(['productSlugs']);
-        const productSlugs = storage2.productSlugs ? storage2.productSlugs.join(', ') : '';
+        //const storage2 = await chrome.storage.local.get(['productSlugs']);
+       // const productSlugs = storage2.productSlugs ? storage2.productSlugs.join(', ') : '';
         
         // Create the prompt message
         const promptMessage = {
@@ -50,7 +50,7 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                           <NOTE>
                           IMPORTANT: Treat mentions of Mac, MacBook, iMac, Mac Mini, etc., as references to Mac devices.
                           Also ,assume iPhone [12,13,14,15,16,...]  as iPhone [12,13,14,15,16,...] pro max.
-                          
+
                           </NOTE>
                           Return a JSON response with:
                           <respond>
@@ -205,6 +205,8 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
             formattedHistory = '';
         }
 
+        const storage2 = await chrome.storage.local.get(['productSlugs']);
+        const productSlugs = storage2.productSlugs ? storage2.productSlugs.join(', ') : '';
         // Get stored settings
         const storage = await chrome.storage.local.get([
             'anthropicApiKey', 
@@ -242,16 +244,12 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         ${formattedHistory}
         </conversation_history>
         
-        **Product Information:**
+        **Product link:**
         - Format:
-          - **Product Slug**: "product_slug"
-          - **Variations**: An array of variations, each with:
-            - **Name**: "Variation Name"
-            - **Price**: "Price in IQD"
-            - **Availability**: 1 (in stock) or 0 (out of stock) or 2 (out of production)
-        <product_info>
-        ${productInfo}
-        </product_info>
+        - https://www.icenter-iraq.com/product/ + "product_slug" 
+        <product_links>
+        ${productSlugs}
+        </product_links>
         
         **Customer Information:**
         - **Name**: ${customerName} (do not translate the name)
@@ -286,10 +284,13 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         - **Completeness**: Ensure all questions and concerns raised by the customer are fully addressed in your response.
         **Response Guidelines:**
         - **Product Origin**: If the customer inquires about the product's origin or model type, inform them that it is a **"موديل شرق أوسط"** (Middle East model).
-
+        - If a product is mentioned, include the product link in your response.
+        - Product link format: https://www.icenter-iraq.com/product/ + "product_slug" 
+        - Inform the customer that the product link contains details on price, colors, and storage options.
+        
         **Note:**
         - Preferred term for "out of stock" is **"not available"**.
-        - Avoid using **"بالمخزون"** as it is not commonly used in the local dialect.        
+        - Avoid using **"بالمخزون"** as it is not commonly used in the local dialect.  
         Now, please compose a response to the customer's message below:
         
         **Customer Message:**
@@ -299,7 +300,7 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         
         **Your Response:**
         <answer>
-        [Your response goes here]
+        [Your response goes here , product link if needed]
         </answer>`
         }];
 

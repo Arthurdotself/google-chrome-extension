@@ -6,28 +6,10 @@ async function createAIHelper() {
     async function processMessages(customerMessage, conversation_history ,customerName ) {
         try {
             // Dynamically import the anthropicService module
-            const { generateFullResponse, identifyProductInMessage } = await import(chrome.runtime.getURL('anthropicService.js'));
-            
-            // First identify products in the message
-            const productInfo = await identifyProductInMessage(customerMessage, conversation_history);
-            console.log('Product identification results:', productInfo);
-            
-            // Initialize productDataString
-            let productDataString = '';
-            
-            // If products were identified and need more info, format the product data
-            if (productInfo && productInfo.needsInfoToAnswer && productInfo.productsData) {
-                // Format product data for inclusion in the prompt
-                productDataString = JSON.stringify(productInfo.productsData, null, 2);
-                console.log('Formatted product data:', productDataString);
-            }
-            
-            // Then generate the full response with the enhanced context
-            // Pass product data string as the third parameter
+            const { generateFullResponse } = await import(chrome.runtime.getURL('anthropicService.js'));
             return await generateFullResponse(
                 customerMessage, 
                 conversation_history,
-                productDataString,
                 customerName
             );
         } catch (error) {
