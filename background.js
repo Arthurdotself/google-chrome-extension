@@ -1,4 +1,5 @@
 // background.js
+
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -13,21 +14,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
       
-      makeAnthropicRequest(request.messages, result.anthropicApiKey)
+      const { messages, modelConfig } = request; // Extract modelConfig from the request
+
+      makeAnthropicRequest(messages, result.anthropicApiKey, modelConfig)
         .then(response => sendResponse({ success: true, data: response }))
         .catch(error => sendResponse({ success: false, error: error.message }));
     });
-    return true;
+    return true; // Indicates you wish to send a response asynchronously
   }
 });
 
 async function makeAnthropicRequest(messages, apiKey, modelConfig = {}) {
   const defaultConfig = {
-    model: "claude-3-5-haiku-20241022",
+    model: "claude-3-5-sonnet-latest",
     max_tokens: 1000,
     temperature: 0.3
   };
 
+  // Merge defaultConfig with modelConfig, giving precedence to modelConfig
   const config = { ...defaultConfig, ...modelConfig };
 
   try {
@@ -48,8 +52,10 @@ async function makeAnthropicRequest(messages, apiKey, modelConfig = {}) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || `API error: ${response.status}`);
+      const errorData = await response.json().catch(() => null);
+      const errorMessage =
+        errorData?.error?.message || `API error: ${response.status}`;
+      throw new Error(errorMessage);
     }
 
     return await response.json();

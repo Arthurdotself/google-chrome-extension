@@ -26,14 +26,14 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
     try {
         // Using Haiku for quick product identification
         const modelConfig = {
-            model: "claude-3-5-haiku-20241022",
+            model: "claude-3-5-haiku-20241022", // Define the Haiku model
             max_tokens: 500,
-            temperature: 0.3
+            temperature: 0.3,
         };
 
         const storage2 = await chrome.storage.local.get(['productSlugs']);
         const productSlugs = storage2.productSlugs ? storage2.productSlugs.join(', ') : '';
-        
+
         // Create the prompt message
         const promptMessage = {
             role: "user",
@@ -63,16 +63,17 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                           </respond>
                            
                           Respond only with the JSON format, no additional explanation.`
-                        };
+        };
 
-        // Get the text content from the response
-        console.log('Full prompt for identifyProductInMessage:', promptMessage);
-        
+        // Debug: Log the modelConfig and prompt for verification
+        console.log('Model Config for identifyProductInMessage:', modelConfig);
+        console.log('Prompt Message:', promptMessage);
+
+        // Ensure modelConfig is passed to makeAnthropicRequest
         const response = await makeAnthropicRequest([promptMessage], modelConfig);
 
         // Rest of the function remains the same...
         const responseText = response.content[0].text.trim();
-        console.log('input for first ai:', response.content);
         console.log('Raw AI response:', responseText);
 
         try {
@@ -218,11 +219,10 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
             throw new Error('API key not found. Please set it in the extension settings.');
         }
         const modelConfig = {
-            model: storage.modelName || "claude-3-5-sonnet-20241022",
-            max_tokens: 1000,
-            temperature: storage.temperature !== undefined ? parseFloat(storage.temperature) : 0.1
+            model: "claude-3-5-sonnet-20240620",
+            max_tokens: 500,
+            temperature: 0.1
         };
-
 
         // Use stored guidelines or default if not set
         const guidelines = storage.guidelines || DEFAULT_GUIDELINES;
@@ -236,11 +236,6 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         <company_info>
         ${COMPANY_INFO}
         </company_info>
-        
-        **Conversation History:**
-        <conversation_history>
-        ${formattedHistory}
-        </conversation_history>
         
         **Product Information:**
         - Format:
@@ -292,6 +287,11 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         - Avoid using **"بالمخزون"** as it is not commonly used in the local dialect.        
         Now, please compose a response to the customer's message below:
         
+        **Conversation History:**
+        <conversation_history>
+        ${formattedHistory}
+        </conversation_history>
+
         **Customer Message:**
         <customer_message>
         ${customerMessage}
@@ -312,6 +312,7 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         if (response && response.content && response.content[0] && response.content[0].text) {
             const text = response.content[0].text;
             const match = text.match(/<answer>(.*?)<\/answer>/s);
+            console.log('the respond from 2 api:',text)
             return match ? match[1].trim() : text.trim();
         } else {
             throw new Error('Invalid response format from API');
@@ -332,7 +333,7 @@ function getStockStatus(stockStatus) {
       return 1; // In stock
     } else if (normalizedStatus === 'outofstock') {
       return 0; // Out of stock
-    } else if (normalizedStatus === 'outofproduction') {
+    } else if (normalizedStatus === 'out of production') {
       return 2; // Out of production
     } else {
       return -1; // Unknown status
