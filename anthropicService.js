@@ -43,6 +43,10 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                           ${customerMessage}
                           </customer_message>
 
+                          <conversation_history>
+                          ${conversation_history}
+                          </conversation_history>
+                          
                           <products_slug>
                           ${productSlugs}
                           </products_slug>
@@ -299,7 +303,7 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         
         **Your Response:**
         <answer>
-        [Your response goes here]
+        [Your response in same lang as customer_message , goes here]
         </answer>`
         }];
 

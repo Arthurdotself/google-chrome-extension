@@ -59,7 +59,7 @@ async function createAIHelper() {
             'Available', 'Message settings', 'All messages', 'Messenger', 'Instagram',
             'Facebook comments', 'Instagram comments', 'More', 'Open Dropdown',
             'Reply in Messenger', 'Menu', 'WhatsAppWhatsAppWhatsAppNewNew', 'placeholder',
-            'WhatsApp'
+            'WhatsApp','www.icenter-iraq.com','الإلكتروني في إستراحة حاليًا، ولكنه في خدمتكم من'
         ];
     
         const isSystemMessage = (text) => {
@@ -258,6 +258,13 @@ function writeToChat(message) {
                 chatContainer?.classList.remove('ai-writing');
             }
             
+            // Detect if the message contains Arabic characters
+            const isArabic = /[\p{Script=Arabic}]/u.test(message);
+
+            // Set the direction based on the language
+            textarea.style.direction = isArabic ? 'rtl' : 'ltr';
+            textarea.style.textAlign = isArabic ? 'right' : 'left';
+
             textarea.value = message;
             const event = new Event('input', {
                 bubbles: true,
