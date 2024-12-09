@@ -2,41 +2,70 @@
 async function createAIHelper() {
   console.log('Facebook Message Extractor initialized');
 
-    // Define processMessages function
-    async function processMessages(customerMessage, conversation_history ,customerName ) {
-        try {
-            // Dynamically import the anthropicService module
-            const { generateFullResponse, identifyProductInMessage } = await import(chrome.runtime.getURL('anthropicService.js'));
-            
-            // First identify products in the message
-            const productInfo = await identifyProductInMessage(customerMessage, conversation_history);
-            console.log('Product identification results:', productInfo);
-            
-            // Initialize productDataString
-            let productDataString = '';
-            
-            // If products were identified and need more info, format the product data
-            if (productInfo && productInfo.needsInfoToAnswer && productInfo.productsData) {
-                // Format product data for inclusion in the prompt
-                productDataString = JSON.stringify(productInfo.productsData, null, 2);
+// Load the anthropicService module once at the start
+// Load the anthropicService module once at initialization
+let anthropicService = null;
+(async () => {
+    anthropicService = await import(chrome.runtime.getURL('anthropicService.js'));
+})();
+
+// Cache frequently accessed data to minimize repetitive storage queries
+let productSlugsCache = null;
+let productVariationsCache = null;
+
+// Preload and cache storage data for faster access
+async function preloadStorageData() {
+    const storageData = await chrome.storage.local.get(['productSlugs', 'productVariations']);
+    productSlugsCache = storageData.productSlugs || [];
+    productVariationsCache = storageData.productVariations || [];
+}
+
+// Preload data once at script initialization
+preloadStorageData();
+
+async function processMessages(customerMessage, conversation_history, customerName) {
+    try {
+        if (!anthropicService) {
+            throw new Error('anthropicService module not loaded yet');
+        }
+
+        const { generateFullResponse, identifyProductInMessage } = anthropicService;
+
+        // Start identifying products immediately
+        const productInfoPromise = identifyProductInMessage(customerMessage, conversation_history);
+
+        // Await product information
+        const productInfo = await productInfoPromise;
+
+        console.log('Product identification results:', productInfo);
+
+        // Initialize product data string
+        let productDataString = '';
+
+        // If additional info is needed, process product data
+        if (productInfo?.needsInfoToAnswer && productInfo.products_slug) {
+            const matchedProducts = productInfo.products_slug.map(slug =>
+                productVariationsCache.find(product => product.slug === slug)
+            ).filter(Boolean); // Filter out null/undefined results
+
+            if (matchedProducts.length > 0) {
+                productDataString = JSON.stringify(matchedProducts, null, 2);
                 console.log('Formatted product data:', productDataString);
             }
-            
-            // Then generate the full response with the enhanced context
-            // Pass product data string as the third parameter
-            return await generateFullResponse(
-                customerMessage, 
-                conversation_history,
-                productDataString,
-                customerName
-            );
-        } catch (error) {
-            console.error('Error in processMessages:', error);
-            return 'Sorry, I encountered an error processing your message.';
         }
-    }
-  
 
+        // Generate a response with the context and product data
+        return await generateFullResponse(
+            customerMessage,
+            conversation_history,
+            productDataString,
+            customerName
+        );
+    } catch (error) {
+        console.error('Error in processMessages:', error);
+        return 'Sorry, I encountered an error processing your message.';
+    }
+}
     function extractMessages() {
         const messageSelectors = [
             '.x1y1aw1k.xn6708d.xwib8y2.x1ye3gou',
@@ -59,7 +88,7 @@ async function createAIHelper() {
             'Available', 'Message settings', 'All messages', 'Messenger', 'Instagram',
             'Facebook comments', 'Instagram comments', 'More', 'Open Dropdown',
             'Reply in Messenger', 'Menu', 'WhatsAppWhatsAppWhatsAppNewNew', 'placeholder',
-            'WhatsApp','www.icenter-iraq.com','الإلكتروني في إستراحة حاليًا، ولكنه في خدمتكم من'
+            'WhatsApp','www.icenter-iraq.com','الإلكتروني في إستراحة حاليًا، ولكنه في خدمتكم من',' فريقنا الإلكتروني في إستراحة حاليًا، ولكنه في خدمتكم من الساعة 9:00 صباحًا حتى 5:00 مساءً، من السبت إلى الخميس. وحتى ذلك الحين، يمكنك زيارة موقعنا الإلكتروني لمعرفة أسعار منتجاتنا وخدماتنا.'
         ];
     
         const isSystemMessage = (text) => {
@@ -112,7 +141,13 @@ async function createAIHelper() {
     }
     
     
-    
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.type === 'triggerSync') {
+          checkAndSync();
+          sendResponse({ success: true });
+        }
+      });
+      
   function extractCustomerName() {
     try {
         // Look for the header wrapper first

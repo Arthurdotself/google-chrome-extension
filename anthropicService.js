@@ -26,9 +26,9 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
     try {
         // Using Haiku for quick product identification
         const modelConfig = {
-            model: "claude-3-5-haiku-20241022", // Define the Haiku model
+            model: "claude-3-5-sonnet-20240620", // Define the Haiku model
             max_tokens: 500,
-            temperature: 0.3,
+            temperature: 0.1,
         };
 
         const storage2 = await chrome.storage.local.get(['productSlugs']);
@@ -76,7 +76,6 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
         // Ensure modelConfig is passed to makeAnthropicRequest
         const response = await makeAnthropicRequest([promptMessage], modelConfig);
 
-        // Rest of the function remains the same...
         const responseText = response.content[0].text.trim();
         console.log('Raw AI response:', responseText);
 
@@ -95,84 +94,23 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                 throw new Error('needsInfoToAnswer is not a boolean');
             }
 
+            let productsData = [];
             if (parsedResponse.needsInfoToAnswer) {
-                const productsData = [];
                 const result = await chrome.storage.local.get(['productVariations']);
                 const variations = result.productVariations || [];
-                
-                const matchExactSlug = (searchSlug, targetSlug) => searchSlug === targetSlug;
 
-                const matchRelatedSlug = (searchSlug, targetSlug) => {
-                    const normalizeString = (str) => {
-                        return str.toLowerCase()
-                            .replace(/[-_]/g, ' ')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-                    };
-                    
-                    const normalizedSearch = normalizeString(searchSlug);
-                    const normalizedTarget = normalizeString(targetSlug);
-                    
-                    const searchParts = normalizedSearch.split(' ');
-                    const targetParts = normalizedTarget.split(' ');
-                    
-                    const matchingParts = searchParts.filter(part => 
-                        targetParts.some(targetPart => 
-                            targetPart.includes(part) || part.includes(targetPart)
-                        )
-                    );
-                    
-                    return matchingParts.length >= Math.min(searchParts.length, targetParts.length) * 0.5;
-                };
-
-                for (const productSlug of parsedResponse.products_slug) {
-                    if (productSlug !== "None") {
-                        console.log('Searching for product match:', productSlug);
-                        
-                        try {
-                            const exactProducts = variations.filter(p => 
-                                matchExactSlug(productSlug, p.slug)
-                            );
-                            
-                            if (exactProducts.length > 0) {
-                                exactProducts.forEach(product => {
-                                    productsData.push(compressProduct({
-                                        slug: product.slug,
-                                        variations: product.variations
-                                    }));
-                                });
-                            } else {
-                                const relatedProducts = variations.filter(p => 
-                                    matchRelatedSlug(productSlug, p.slug)
-                                );
-                                
-                                if (relatedProducts.length > 0) {
-                                    relatedProducts.forEach(product => {
-                                        productsData.push(compressProduct({
-                                            slug: product.slug,
-                                            variations: product.variations
-                                        }));
-                                    });
-                                }
-                            }
-                        } catch (error) {
-                            console.error(`Error searching for product ${productSlug}:`, error);
-                        }
-                    }
-                }
-                
-                console.log('Got product data:', productsData);
-                
-                return {
-                    needsInfoToAnswer: true,
-                    products_slug: parsedResponse.products_slug,
-                    productsData: productsData
-                };
-            } else {
-                return {
-                    needsInfoToAnswer: false
-                };
+                // Filter product variations based on slugs directly from AI response
+                productsData = parsedResponse.products_slug.map(productSlug => {
+                    const matchedProduct = variations.find(v => v.slug === productSlug);
+                    return matchedProduct ? compressProduct(matchedProduct) : null;
+                }).filter(Boolean); // Remove null values
             }
+            
+            return {
+                needsInfoToAnswer: parsedResponse.needsInfoToAnswer,
+                products_slug: parsedResponse.products_slug,
+                productsData: productsData
+            };
 
         } catch (parseError) {
             console.error('Error processing response:', parseError);
@@ -225,7 +163,8 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         const modelConfig = {
             model: "claude-3-5-sonnet-20240620",
             max_tokens: 500,
-            temperature: 0.1
+            temperature: 0.0,
+            stream: true
         };
 
         // Use stored guidelines or default if not set
@@ -240,7 +179,14 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         <company_info>
         ${COMPANY_INFO}
         </company_info>
-        
+        <company_website>
+        https://www.icenter-iraq.com
+        </company_website>
+
+        <company_website_for_product>
+        https://www.icenter-iraq.com/product/ [product slag] 
+        for example : https://www.icenter-iraq.com/product/iphone-16-pro-max/
+        </company_website_for_product>
         **Product Information:**
         - Format:
           - **Product Slug**: "product_slug"
@@ -300,10 +246,10 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         <customer_message>
         ${customerMessage}
         </customer_message>
-        
+       
         **Your Response:**
         <answer>
-        [Your response in same lang as customer_message , goes here]
+        [Your response in same lang as customer_message like (english, arabic ,ckb) , goes here]
         </answer>`
         }];
 
