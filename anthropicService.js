@@ -54,8 +54,8 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                           <NOTE>
                           IMPORTANT: Treat mentions of Mac, MacBook, iMac, Mac Mini, etc., as references to Mac devices.
                           Also ,assume iPhone [12,13,14,15,16,...]  as iPhone [12,13,14,15,16,...] pro max.
-                          
                           </NOTE>
+
                           Return a JSON response with:
                           <respond>
                           <products_slug>
@@ -64,6 +64,9 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
                           <needsInfoToAnswer>
                           [true if additional product details needed (price, availability, specs), false otherwise]
                           </needsInfoToAnswer>
+                          <catugory_of_product>
+                          [write the product catugory here like "mac" or "iPhone" or "watch" ]
+                          </catugory_of_product>
                           </respond>
                            
                           Respond only with the JSON format, no additional explanation.`
