@@ -239,20 +239,29 @@ function getConversationData() {
     let conversation_history = '';
     let customerMessage = '';
 
+    // Determine the index of the last bot message
+    let lastBotIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].isBot) {
+            lastBotIndex = i;
+            break;
+        }
+    }
+
     // Build conversation_history and customerMessage
     messages.forEach((msg, index) => {
-        if (msg.isBot) {
-            // Include bot messages in conversation history
-            conversation_history += `Bot: ${msg.text}\n`;
-        } else {
+        if (!msg.isBot) {
             // Message is from the customer
-            conversation_history += `Customer: ${msg.text}\n`;
-            
-            // Add to customerMessage if it's not already answered
-            if (index === messages.length - 1 || !messages[index + 1].isBot) {
+            if (lastBotIndex !== -1 && index < lastBotIndex) {
+                // Message is before the last bot message, so it's answered
+                conversation_history += msg.text + '\n';
+            } else if (index > lastBotIndex || lastBotIndex === -1) {
+                // Message is after the last bot message or no bot messages have been sent
+                // So it's pending and added to customerMessage
                 customerMessage += msg.text + '\n';
             }
         }
+        // Bot messages are excluded entirely
     });
 
     // Remove trailing newlines
@@ -265,6 +274,7 @@ function getConversationData() {
         customerName
     };
 }
+
 
 
 
@@ -336,7 +346,6 @@ function writeToChat(message) {
                 customerName
             );
            writeToChat(response);
-           clickMarkAsLeadButton();
             } catch (error) {
             console.error('Error processing message:', error);
             writeToChat('Sorry, I encountered an error processing your message.');
@@ -347,59 +356,6 @@ function writeToChat(message) {
 }
 
 
-// Function to find and click the button with the text "Mark as lead"
-function clickMarkAsLeadButton() {
-    // Find all buttons with the specified attributes
-    const buttons = document.querySelectorAll('div[role="button"][aria-busy="false"]');
-
-    // Filter buttons to find the one containing the "Mark as lead" text
-    const markAsLeadButton = Array.from(buttons).find(button =>
-        button.textContent.trim() === 'Mark as lead'
-    );
-
-    // Click the button if it exists
-    if (markAsLeadButton) {
-        console.log('Button found:', markAsLeadButton);
-        markAsLeadButton.click();
-
-        // Find the input field with the specified attributes
-        const inputField = document.querySelector('input[placeholder="Add label"][aria-autocomplete="list"][type="text"]');
-
-        // Check if the input field exists and write "iPhone"
-        if (inputField) {
-            console.log('Input field found:', inputField);
-        
-            // Set the value
-            inputField.value = 'iPhone';
-        
-            // Trigger input event to register the value
-            const inputEvent = new Event('input', {
-                bubbles: true,
-                cancelable: true,
-            });
-            inputField.dispatchEvent(inputEvent);
-        
-            console.log('Value "iPhone" written to input field');
-        
-            // Simulate pressing the Enter key
-            const enterEvent = new KeyboardEvent('keydown', {
-                key: 'Enter',
-                code: 'Enter',
-                keyCode: 13, // Deprecated but still works
-                which: 13,
-                bubbles: true,
-                cancelable: true,
-            });
-            inputField.dispatchEvent(enterEvent);
-        
-            console.log('Enter key pressed');
-        } else {
-            console.error('Input field not found');
-        }
-    } else {
-        console.error('Mark as lead button not found');
-    }
-}
 
 function insertAIHelper() {
     // Find both the button and the tooltip
