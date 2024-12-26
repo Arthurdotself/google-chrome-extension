@@ -446,73 +446,75 @@ async function testWooCommerceConnection(wooKey, wooSecret) {
 
 async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
   const baseUrl = 'https://www.icenter-iraq.com/wp-json/wc/v3/products';
-  const categoryIds = [ 20, 21, 22, 23, 24];
-  const productMap = new Map();
+  const categoryIds = [20, 21, 22, 23, 24];
   
+  // A Map to store products by their ID to prevent duplicates across categories
+  const productMap = new Map();
+
+  // ----- Fetching Products by Category -----
   updateProgress(60, 'Fetching products...');
   
-  // Calculate progress steps for categories
-  const progressPerCategory = 10; // 10% progress per category (40% total)
+  // Each category fetch contributes evenly to the progress bar
+  const progressPerCategory = 10; // Total categories: 5 => 5 * 10% = 50%
   
-  // Fetch all products from categories and store them in a Map to avoid duplicates
   for (let i = 0; i < categoryIds.length; i++) {
     const categoryId = categoryIds[i];
+    
+    // Update progress before fetching the next category
+    updateProgress(
+      60 + progressPerCategory * i,
+      `Fetching category ${i + 1}/${categoryIds.length}...`
+    );
+
     try {
       const url = new URL(baseUrl);
       url.searchParams.append('consumer_key', wooKey);
       url.searchParams.append('consumer_secret', wooSecret);
       url.searchParams.append('category', categoryId);
       url.searchParams.append('per_page', '100');
-      
-      updateProgress(
-        60 + (progressPerCategory * i), 
-        `Fetching category ${i + 1}/${categoryIds.length}...`
-      );
-      
+
       const response = await fetch(url.toString());
-      
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
       }
 
       const products = await response.json();
-
-      // Add products to the Map using their ID to prevent duplicates
       products.forEach(product => {
+        // Only add if we don't already have this product
         if (!productMap.has(product.id)) {
           productMap.set(product.id, product);
         }
       });
-      
-      // Update progress after each category
+
+      // Update progress after successfully fetching and storing products for this category
       updateProgress(
-        60 + (progressPerCategory * (i + 1)), 
+        60 + progressPerCategory * (i + 1),
         `Fetched category ${i + 1}/${categoryIds.length}`
       );
-      
+
     } catch (error) {
       console.error(`Error fetching category ${categoryId}:`, error);
-      throw error;
+      throw error; // Rethrow so the main flow can handle it if needed
     }
   }
 
-  // Convert the Map to an array of products
+  // Convert the product map back to an array
   const allProducts = Array.from(productMap.values());
 
-  // Exclude products with catalog_visibility set to 'hidden'
-  const visibleProducts = allProducts.filter(product => product.catalog_visibility !== 'hidden');
+  // Separate visible and hidden products
+  const visibleProducts = allProducts.filter(p => p.catalog_visibility !== 'hidden');
+  const hiddenProducts = allProducts.filter(p => p.catalog_visibility === 'hidden');
 
   // Store slugs of visible products
-  const allSlugs = visibleProducts.map(product => product.slug);
+  const allSlugs = visibleProducts.map(p => p.slug);
   await chrome.storage.local.set({ productSlugs: allSlugs });
   console.log('Stored product slugs:', allSlugs);
 
-  // Initialize arrays for variations and out-of-production products
+  // Prepare arrays to store variations and out-of-production products
   const variations = [];
   const outOfProductionProducts = [];
 
-  // Handle products that are hidden (out of production)
-  const hiddenProducts = allProducts.filter(product => product.catalog_visibility === 'hidden');
+  // Hidden products are considered "out of production"
   hiddenProducts.forEach(product => {
     outOfProductionProducts.push({
       slug: product.slug,
@@ -520,24 +522,25 @@ async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
     });
   });
 
-  // Fetch variations for variable products that are visible
+  // Among visible products, find those that are variable and need variations fetched
   const variableProducts = visibleProducts.filter(p => p.type === 'variable');
   
-  // Calculate progress steps for variations
+  // Progress calculations for variations
   const totalVariableProducts = variableProducts.length;
   const progressPerVariation = totalVariableProducts > 0 ? 10 / totalVariableProducts : 0;
-  
+
   updateProgress(90, 'Fetching product variations...');
-  
+
+  // ----- Fetching Variations for Each Variable Product -----
   for (let i = 0; i < variableProducts.length; i++) {
     const product = variableProducts[i];
+    
+    updateProgress(
+      90 + progressPerVariation * i,
+      `Fetching variations ${i + 1}/${totalVariableProducts}...`
+    );
 
     try {
-      updateProgress(
-        90 + (progressPerVariation * i),
-        `Fetching variations ${i + 1}/${totalVariableProducts}...`
-      );
-      
       const productVariations = await fetchProductVariations(wooKey, wooSecret, product.id);
       if (productVariations.length > 0) {
         variations.push({
@@ -547,16 +550,18 @@ async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
       }
     } catch (error) {
       console.error(`Error fetching variations for product ${product.slug}:`, error);
+      // Continue with the next product; we don't throw here to ensure partial results can be saved
     }
   }
 
-  // Store the variations and out-of-production products
+  // ----- Storing Final Results -----
   updateProgress(98, 'Saving data...');
-  await chrome.storage.local.set({ 
+  await chrome.storage.local.set({
     productVariations: variations,
     outOfProductionProducts: outOfProductionProducts
   });
-  
+
+  // Logging for debugging and verification
   console.log('Stored productVariations structure:', JSON.stringify(variations, null, 2));
   console.log('Number of products with variations:', variations.length);
   variations.forEach(product => {
@@ -567,8 +572,11 @@ async function fetchAndStoreProducts(wooKey, wooSecret, updateProgress) {
   });
   
   console.log('Out of production products:', JSON.stringify(outOfProductionProducts, null, 2));
-  
+
+  // Mark operation complete
   updateProgress(100, 'Complete!');
+
+  // Return some key data that might be useful elsewhere
   return { slugs: allSlugs, variations, outOfProductionProducts };
 }
 

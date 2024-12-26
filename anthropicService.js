@@ -1,3 +1,6 @@
+import getServicePrice from './servicePrices.js'; // Adjust the path if necessary
+
+
 async  function makeAnthropicRequest(messages, modelConfig = {}) {
     try {
         const response = await chrome.runtime.sendMessage({
@@ -53,11 +56,14 @@ async function identifyProductInMessage(customerMessage, conversation_history) {
 
                           <NOTE>
                           IMPORTANT: Treat mentions of Mac, MacBook, iMac, Mac Mini, etc., as references to Mac devices.
-                          Also ,assume iPhone [12,13,14,15,16,...]  as iPhone [12,13,14,15,16,...] pro max.
+                          Also 
                           
                           </NOTE>
                           Return a JSON response with:
                           <respond>
+                          <service>
+                          [is this is a serveice ]
+                          </service>
                           <products_slug>
                           [ array , as iphone-14 , iphone-16-pro-max ,iMac , apple watch...]
                           </products_slug>
@@ -157,6 +163,9 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
             'temperature'
         ]);
 
+        const ServicesPrices = "";
+
+
         if (!storage.anthropicApiKey) {
             throw new Error('API key not found. Please set it in the extension settings.');
         }
@@ -173,7 +182,7 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         const COMPANY_INFO = "iCenter AI Customer Support Response Guide 1. Product Information & Warranty Product Authentication  All products are official Middle East versions Come with manufacturer warranty:  only for iPhone 2 years warranty ,(everythink eals 1 year warranty .) Mac: 1 year warranty + English/Arabic Keyboard + Educational Offer iPad: 1 year replacement warranty AirPods: 1 year replacement warranty Watch: 1 year warranty Accessories: 1 year warranty + MFi Certification   All repairs by Apple-certified technicians using genuine parts 3-months warranty on replaced parts  iPhone Features  Dual SIM: 1 physical SIM + 1 eSIM Up to 8 eSIMs can be stored Enhanced security features - cannot be removed Myth clarification: eSIM does not cause device overheating  2. Delivery & Payment Delivery Policy  Orders above 50,000 IQD: Free delivery Orders below 50,000 IQD: 5,000 IQD fee Delivery time: 3-5 working days Cash on delivery available  Payment Options  Cash on delivery Credit Card FIB Installments through Miswag (Qi Card holders) Visit: https://miswag.com/merchant/icenter  Trade-in Services  Available for: Phones, Laptops, Tablets Not eligible: AirPods Instant price estimate: https://tradein.icenter-iraq.com/ir-en/  3. Locations & Contact Information Erbil (Main)  Location: Ankawa - Bakhtiari Road Showroom: 9:00 AM - 11:00 PM daily Service: 9:00 AM - 5:00 PM (Thu: 9:00 AM - 1:00 PM, Fri: Closed) Contacts:  Showroom: 0751 7418146 Sales: 07508942096 Service: 07502347717 Bazaar Support: 07503116716   Link: https://g.page/r/CXfdCsQBBjaUEAo  Baghdad  Location: Al-Zayyouna - Al-Rubaie Street Showroom: 10:00 AM - 11:00 PM (Fri: Closed) Service: 10:00 AM - 6:00 PM (Fri: Closed) Contacts:  Showroom: 07707071307 Service: 07727854040   Link: https://g.page/r/CQN3vQVtdD0pEAo  Sulaymaniyah  Bakhtiari Branch:  Location: Near Talari Honar Hours: 9:00 AM - 11:00 PM daily Contacts:  Showroom: 07727851010 Sales: 07508942096 Mawlawi Support: 07700834666   No Service Department Link: https://g.page/r/CUUuoTpLgJWnEAo   King Mahmoud Branch:  Location: Zargata Bridge Service: 9:00 AM - 5:00 PM (Thu: 9:00 AM - 1:00 PM, Fri: Closed) Contacts:  Sales: 07727856060 Service: 07727852020   Link: https://maps.app.goo.gl/FdYh2Uj7Vi9MSR1q8    Duhok  Location: Opposite Judy Restaurant Showroom: 9:00 AM - 11:00 PM daily Service: 9:00 AM - 5:00 PM (Thu: 9:00 AM - 1:00 PM, Fri: Closed) Contacts:  Showroom: 0751 741 8151 Sales: 07508942096 Service: 07503303141   Link: https://g.page/r/CUTb5TGpqtr1EAo  4. if really necessary  you have this (  Online Sales: 07508942096 B2B Inquiries: 07505122022 Marketing: 07509849454 ) 5. Warranty Coverage Details  Duration: As per product specification Covered:  Manufacturing defects Normal functionality issues   Not covered:  Physical damage Water damage Misuse   Special notes:  iPads and AirPods: Replacement warranty Other products: Repair warranty   Backorder options Out of production explanations with alternative suggestions  7. Service Quality Assurance  All repairs performed by Apple-certified technicians Only genuine Apple parts and tools used 3-months warranty on all replaced parts Service quality guaranteed . B2B requests: Forward to B2B team (07505122022)";
         const messages = [{
             role: "user",
-            content: `You are an AI sales assistant for iCenter, an authorized Apple reseller and service provider in Iraq Kurdistan. Your goal is to provide excellent customer service, answer inquiries, and promote sales of Apple products and services.
+            content: `You are an AI sales assistant for iCenter, an authorized Apple reseller and service provider in Iraq . Your goal is to provide excellent customer service, answer inquiries, and promote sales of Apple products and services.
         
         **Company Information:**
         <company_info>
@@ -197,7 +206,10 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
         <product_info>
         ${productInfo}
         </product_info>
-        
+        <Services_prices>
+        ${ServicesPrices}
+        </Services_prices>
+
         **Customer Information:**
         - **Name**: ${customerName} (do not translate the name)
         
@@ -234,7 +246,8 @@ async function generateFullResponse(customerMessage, conversationHistory, produc
 
         **Note:**
         - Preferred term for "out of stock" is **"not available"**.
-        - Avoid using **"بالمخزون"** as it is not commonly used in the local dialect.        
+        - Avoid using **"بالمخزون"** as it is not commonly used in the local dialect.  
+              
         Now, please compose a response to the customer's message below:
         
         **Conversation History:**

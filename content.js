@@ -89,6 +89,7 @@ async function processMessages(customerMessage, conversation_history, customerNa
             'Facebook comments', 'Instagram comments', 'More', 'Open Dropdown',
             'Reply in Messenger', 'Menu', 'WhatsAppWhatsAppWhatsAppNewNew', 'placeholder',
             'WhatsApp','www.icenter-iraq.com','الإلكتروني في إستراحة حاليًا، ولكنه في خدمتكم من',' فريقنا الإلكتروني في إستراحة حاليًا، ولكنه في خدمتكم من الساعة 9:00 صباحًا حتى 5:00 مساءً، من السبت إلى الخميس. وحتى ذلك الحين، يمكنك زيارة موقعنا الإلكتروني لمعرفة أسعار منتجاتنا وخدماتنا.'
+            ,'كيف أطلب iPhone وأعرف أسعار جميع الموديلات؟'
         ];
     
         const isSystemMessage = (text) => {
